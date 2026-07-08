@@ -29,7 +29,7 @@ class SpeechToText:
         try:
             import speech_recognition as sr
         except Exception:
-            return "SpeechRecognition or PyAudio is not installed."
+            return "Speech recognition packages are not installed."
 
         settings = self.settings_manager.load_settings()
         language_code = get_language_code(settings.get("language", "English"))
@@ -43,7 +43,8 @@ class SpeechToText:
             with sr.Microphone(device_index=microphone_index) as source:
                 recognizer.adjust_for_ambient_noise(source, duration=0.5)
                 audio = recognizer.listen(source, timeout=5, phrase_time_limit=8)
-            return recognizer.recognize_google(audio, language=language_code)
+            recognized_text = recognizer.recognize_google(audio, language=language_code)
+            return recognized_text.strip() or "Could not understand the audio."
         except sr.WaitTimeoutError:
             return "No speech detected."
         except sr.UnknownValueError:
@@ -55,6 +56,20 @@ class SpeechToText:
             return f"Microphone error: {error}"
         finally:
             self.is_listening = False
+
+    def microphone_ready(self) -> tuple[bool, str]:
+        """Return whether the microphone stack can be opened."""
+        try:
+            import speech_recognition as sr
+
+            microphone_index = self._find_microphone_index(
+                self.settings_manager.load_settings().get("microphone", "Default")
+            )
+            with sr.Microphone(device_index=microphone_index):
+                return True, "Microphone is available."
+        except Exception as error:
+            self.logger.error("Microphone readiness check failed: %s", error)
+            return False, f"Microphone is not available: {error}"
 
     def stop_listening(self) -> None:
         """Stop the current listening state."""

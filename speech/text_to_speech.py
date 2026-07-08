@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from config.settings_manager import SettingsManager
+from utils.logger import get_logger
 
 
 class TextToSpeech:
@@ -11,6 +12,7 @@ class TextToSpeech:
     def __init__(self, settings_manager: SettingsManager) -> None:
         self.settings_manager = settings_manager
         self.engine = None
+        self.logger = get_logger()
         self._initialize_engine()
 
     def speak(self, text: str) -> str:
@@ -22,8 +24,9 @@ class TextToSpeech:
             self.set_voice()
             self.engine.say(text)
             self.engine.runAndWait()
-            return "Speaker test completed."
+            return "Speech completed."
         except Exception as error:
+            self.logger.error("Speaker error: %s", error)
             return f"Speaker error: {error}"
 
     def stop(self) -> None:
@@ -57,7 +60,8 @@ class TextToSpeech:
     def set_rate(self, rate: int) -> None:
         """Set speech speed."""
         if self.engine is not None:
-            self.engine.setProperty("rate", rate)
+            safe_rate = max(80, min(260, rate))
+            self.engine.setProperty("rate", safe_rate)
 
     def set_volume(self, volume: float) -> None:
         """Set speech volume between 0.0 and 1.0."""
@@ -65,11 +69,30 @@ class TextToSpeech:
             safe_volume = max(0.0, min(1.0, volume))
             self.engine.setProperty("volume", safe_volume)
 
+    def list_voices(self) -> list[str]:
+        """Return available local TTS voices."""
+        if self.engine is None:
+            return ["Text-to-speech engine is not available."]
+
+        try:
+            voices = self.engine.getProperty("voices")
+            return [str(getattr(voice, "name", "Unknown voice")) for voice in voices]
+        except Exception as error:
+            self.logger.error("Voice listing failed: %s", error)
+            return [f"Voice listing failed: {error}"]
+
+    def speaker_ready(self) -> tuple[bool, str]:
+        """Return whether the TTS engine is ready."""
+        if self.engine is None:
+            return False, "Text-to-speech engine is not available."
+        return True, "Text-to-speech engine is available."
+
     def _initialize_engine(self) -> None:
         """Initialize pyttsx3 without crashing the app."""
         try:
             import pyttsx3
 
             self.engine = pyttsx3.init()
-        except Exception:
+        except Exception as error:
+            self.logger.error("Text-to-speech initialization failed: %s", error)
             self.engine = None
