@@ -62,6 +62,17 @@ class AppLauncher:
             ["powershell.exe", "pwsh.exe"],
         ),
         "file explorer": AppDefinition([["explorer.exe"]], ["explorer.exe"]),
+        "task manager": AppDefinition([["taskmgr.exe"]], ["Taskmgr.exe"]),
+        "settings": AppDefinition(
+            [["cmd", "/c", "start", "", "ms-settings:"]],
+            ["SystemSettings.exe"],
+        ),
+        "control panel": AppDefinition([["control.exe"]], ["control.exe"]),
+        "device manager": AppDefinition(
+            [["mmc.exe", "devmgmt.msc"], ["devmgmt.msc"]],
+            ["mmc.exe"],
+        ),
+        "system information": AppDefinition([["msinfo32.exe"]], ["msinfo32.exe"]),
     }
 
     def open_application(self, name: str) -> tuple[bool, str]:

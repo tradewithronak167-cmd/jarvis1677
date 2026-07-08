@@ -21,3 +21,11 @@ def test_unsupported_application_returns_error() -> None:
 
     assert not success
     assert "not supported" in message
+
+
+def test_system_tools_have_launch_commands() -> None:
+    """Safe Windows system tools should be registered for chat launching."""
+    launcher = AppLauncher()
+    for app_name in ("task manager", "settings", "device manager", "system information"):
+        app = launcher.APPLICATIONS[app_name]
+        assert launcher._candidate_commands(app_name, app)

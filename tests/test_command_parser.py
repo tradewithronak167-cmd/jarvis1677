@@ -35,6 +35,14 @@ def test_close_application_command() -> None:
     assert parsed.target == "notepad"
 
 
+def test_open_device_manager_command() -> None:
+    """Device Manager is available as a safe system-tool launcher."""
+    parsed = CommandParser().parse("open device manager")
+
+    assert parsed.action == "open_application"
+    assert parsed.target == "device manager"
+
+
 def test_create_folder_command() -> None:
     """Create folder command maps to file management."""
     parsed = CommandParser().parse("create folder Projects")

@@ -21,6 +21,12 @@ class IntentClassifier:
         "command prompt": "command prompt",
         "powershell": "powershell",
         "file explorer": "file explorer",
+        "task manager": "task manager",
+        "settings": "settings",
+        "windows settings": "settings",
+        "control panel": "control panel",
+        "device manager": "device manager",
+        "system information": "system information",
     }
     FOLDER_ALIASES: dict[str, str] = {
         "downloads": "downloads",

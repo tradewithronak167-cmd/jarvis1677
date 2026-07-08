@@ -35,7 +35,6 @@ class ChatWindow(ctk.CTkToplevel):
         self.status_label: ctk.CTkLabel | None = None
         self.confirm_button: ctk.CTkButton | None = None
         self.cancel_button: ctk.CTkButton | None = None
-        self.speak_response_var = ctk.BooleanVar(value=False)
 
         self._configure_window()
         self.create_layout()
@@ -67,7 +66,7 @@ class ChatWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        header = ctk.CTkFrame(self, corner_radius=0, fg_color="#111827")
+        header = ctk.CTkFrame(self, corner_radius=0, fg_color="#07111F")
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
 
@@ -82,7 +81,8 @@ class ChatWindow(ctk.CTkToplevel):
         self.status_label = ctk.CTkLabel(
             header,
             text=self._status_text(),
-            text_color="#D1D5DB",
+            text_color="#93C5FD",
+            font=ctk.CTkFont(size=13, weight="bold"),
         )
         self.status_label.grid(row=1, column=0, padx=24, pady=(0, 14), sticky="w")
 
@@ -90,17 +90,29 @@ class ChatWindow(ctk.CTkToplevel):
             self,
             wrap="word",
             font=ctk.CTkFont(size=15),
-            fg_color="#0B1120",
+            fg_color="#080F1D",
             text_color="#E5E7EB",
+            border_width=1,
+            border_color="#1E293B",
+            corner_radius=8,
         )
         self.chat_display.grid(row=1, column=0, padx=24, pady=18, sticky="nsew")
         self.chat_display.configure(state="disabled")
 
-        input_frame = ctk.CTkFrame(self, fg_color="#111827", corner_radius=0)
+        input_frame = ctk.CTkFrame(self, fg_color="#07111F", corner_radius=0)
         input_frame.grid(row=2, column=0, sticky="ew")
         input_frame.grid_columnconfigure(0, weight=1)
 
-        self.input_box = ctk.CTkTextbox(input_frame, height=70, wrap="word")
+        self.input_box = ctk.CTkTextbox(
+            input_frame,
+            height=70,
+            wrap="word",
+            fg_color="#0F172A",
+            border_width=1,
+            border_color="#1E293B",
+            corner_radius=8,
+            font=ctk.CTkFont(size=14),
+        )
         self.input_box.grid(row=0, column=0, padx=24, pady=(18, 12), sticky="ew")
         self.input_box.bind("<Return>", self._handle_enter_key)
         self.input_box.bind("<Shift-Return>", self._handle_shift_enter_key)
@@ -117,13 +129,6 @@ class ChatWindow(ctk.CTkToplevel):
             hover_color="#4B5563",
         )
         clear_button.grid(row=0, column=0, padx=(0, 10), sticky="w")
-
-        speak_checkbox = ctk.CTkCheckBox(
-            controls,
-            text="Speak AI response",
-            variable=self.speak_response_var,
-        )
-        speak_checkbox.grid(row=0, column=1, sticky="w")
 
         self.confirm_button = ctk.CTkButton(
             controls,
@@ -249,17 +254,30 @@ class ChatWindow(ctk.CTkToplevel):
         else:
             self._hide_confirmation_controls()
 
+        if is_ai_response and result.success:
+            self._speak_ai_response(result.message)
+
     def _handle_ai_response(self, response: str) -> None:
         """Display and optionally speak the AI response."""
         self._append_display("HI ROLEX", response)
         self._set_status(f"{self.ai_manager.last_provider_used} response completed.")
 
-        if self.speak_response_var.get() and self.speech_manager is not None:
-            threading.Thread(
-                target=self.speech_manager.speak,
-                args=(response,),
-                daemon=True,
-            ).start()
+        self._speak_ai_response(response)
+
+    def _speak_ai_response(self, response: str) -> None:
+        """Speak AI chat responses automatically when TTS is available."""
+        if self.speech_manager is None:
+            return
+
+        speech_text = response.strip()
+        if not speech_text:
+            return
+
+        threading.Thread(
+            target=self.speech_manager.speak,
+            args=(speech_text[:700],),
+            daemon=True,
+        ).start()
 
     def _show_confirmation_controls(self) -> None:
         """Show Confirm and Cancel buttons."""
@@ -292,7 +310,8 @@ class ChatWindow(ctk.CTkToplevel):
             return
 
         self.chat_display.configure(state="normal")
-        self.chat_display.insert("end", f"\n{sender}: {message}\n")
+        self.chat_display.insert("end", f"\n{sender}\n")
+        self.chat_display.insert("end", f"{message}\n")
         self.chat_display.see("end")
         self.chat_display.configure(state="disabled")
 
