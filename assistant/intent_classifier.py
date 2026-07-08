@@ -91,6 +91,8 @@ class IntentClassifier:
         if normalized.startswith("open "):
             target = normalized.removeprefix("open ").strip()
             original_target = original_text[len("open ") :].strip()
+            if any(term in target for term in self.DANGEROUS_TERMS):
+                return CommandIntent("unknown", original_text, parameters={"dangerous": "true"})
             if target in self.APP_ALIASES:
                 return CommandIntent("open_app", original_text, self.APP_ALIASES[target])
             if target in self.FOLDER_ALIASES:
@@ -101,6 +103,7 @@ class IntentClassifier:
                 return CommandIntent("open_folder", original_text, original_target[7:].strip())
             if self._looks_like_url(target):
                 return CommandIntent("open_website", original_text, original_target)
+            return CommandIntent("open_app", original_text, original_target)
 
         if normalized.startswith("close "):
             target = normalized.removeprefix("close ").strip()

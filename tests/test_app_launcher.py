@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from automation.app_launcher import AppLauncher
 
 
@@ -20,7 +23,7 @@ def test_unsupported_application_returns_error() -> None:
     success, message = AppLauncher().open_application("missing-test-app")
 
     assert not success
-    assert "not supported" in message
+    assert "could not find" in message.casefold()
 
 
 def test_system_tools_have_launch_commands() -> None:
@@ -29,3 +32,20 @@ def test_system_tools_have_launch_commands() -> None:
     for app_name in ("task manager", "settings", "device manager", "system information"):
         app = launcher.APPLICATIONS[app_name]
         assert launcher._candidate_commands(app_name, app)
+
+
+def test_generic_start_menu_app_can_launch(monkeypatch, tmp_path: Path) -> None:
+    """Unknown app names should be opened when a Start Menu shortcut exists."""
+    shortcut = tmp_path / "Example App.lnk"
+    shortcut.write_text("", encoding="utf-8")
+    opened_paths: list[Path] = []
+    launcher = AppLauncher()
+
+    monkeypatch.setattr(launcher, "_start_menu_shortcuts", lambda: [shortcut])
+    monkeypatch.setattr(os, "startfile", lambda path: opened_paths.append(Path(path)))
+
+    success, message = launcher.open_application("example app")
+
+    assert success
+    assert opened_paths == [shortcut]
+    assert "Launch requested" in message

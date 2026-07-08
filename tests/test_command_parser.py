@@ -43,6 +43,14 @@ def test_open_device_manager_command() -> None:
     assert parsed.target == "device manager"
 
 
+def test_open_unknown_app_routes_to_application_launcher() -> None:
+    """Any open-app command should reach the launcher for installed app discovery."""
+    parsed = CommandParser().parse("open whatsapp")
+
+    assert parsed.action == "open_application"
+    assert parsed.target == "whatsapp"
+
+
 def test_create_folder_command() -> None:
     """Create folder command maps to file management."""
     parsed = CommandParser().parse("create folder Projects")

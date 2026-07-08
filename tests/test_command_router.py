@@ -11,6 +11,14 @@ def test_open_chrome_creates_safe_action() -> None:
     assert not plan.requires_confirmation
 
 
+def test_unknown_open_app_creates_launch_action() -> None:
+    """Installed app discovery should handle app names beyond the fixed alias list."""
+    plan = CommandRouter().create_plan("open whatsapp")
+
+    assert plan.actions[0].intent.category == "open_app"
+    assert plan.actions[0].intent.target == "whatsapp"
+
+
 def test_delete_file_requires_confirmation() -> None:
     """Delete file must not execute without confirmation."""
     result = CommandRouter().handle_user_input("delete file test.txt")

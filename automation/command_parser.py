@@ -137,6 +137,7 @@ class CommandParser:
                 return ParsedCommand("open_website", url, f"Opening {target}")
             if self._looks_like_url(target):
                 return ParsedCommand("open_website", target, f"Opening {target}")
+            return ParsedCommand("open_application", original_target, f"Opening {original_target}")
 
         if normalized_command.startswith("close "):
             target = normalized_command.removeprefix("close ").strip()
