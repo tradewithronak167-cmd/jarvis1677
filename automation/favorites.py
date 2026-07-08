@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from utils.app_paths import DATA_DIR
+
 
 class FavoritesManager:
     """Persists favorite local paths to data/favorites.json."""
@@ -60,4 +62,4 @@ class FavoritesManager:
 
     def _default_path(self, filename: str) -> Path:
         """Return a project data path."""
-        return Path(__file__).resolve().parents[1] / "data" / filename
+        return DATA_DIR / filename

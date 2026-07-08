@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from utils.app_paths import DATA_DIR
+
 
 class ConversationManager:
     """Stores chat messages and saves them to data/conversation_history.json."""
@@ -70,4 +72,4 @@ class ConversationManager:
 
     def _default_history_path(self) -> Path:
         """Return the default project conversation-history path."""
-        return Path(__file__).resolve().parents[1] / "data" / "conversation_history.json"
+        return DATA_DIR / "conversation_history.json"

@@ -1,23 +1,34 @@
-__pycache__/
-*.py[cod]
-*.pyo
+.env
+.env.*
+.env_*
+!.env.example
 
 .venv/
 venv/
 env/
 
-.env
-.env.*
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.py[cod]
+
+build/
+dist/
+release/
+*.spec
+
+data/logs/
+data/*.db
+data/*.sqlite
+data/conversation_history.json
+data/favorites.json
+data/file_history.json
+*.db-journal
+*.log
 
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
 .vscode/
-
-data/*.db
-data/*.sqlite
-data/*.json
-data/*.log
-
-*.log

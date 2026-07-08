@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from config.settings_manager import SettingsManager
+from utils.app_paths import LANGUAGE_DIR
 
 
 class LanguageManager:
@@ -27,7 +28,7 @@ class LanguageManager:
         language_dir: Path | None = None,
     ) -> None:
         self.settings_manager = settings_manager
-        self.language_dir = language_dir or Path(__file__).parent
+        self.language_dir = language_dir or LANGUAGE_DIR
         self.current_language = "English"
         self.translations: dict[str, str] = {}
         self.load_language()

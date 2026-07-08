@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 
 from config.settings_manager import SettingsManager
 from speech.speech_manager import SpeechManager
+from utils.app_paths import ASSETS_DIR
 from wakeword.wake_detector import WakeDetector
 from wakeword.wake_listener import WakeListener
 
@@ -83,7 +83,7 @@ class WakeWordManager:
 
     def _play_wake_sound(self) -> None:
         """Play assets/sounds/wake.wav when available."""
-        wake_sound_path = Path(__file__).resolve().parents[1] / "assets" / "sounds" / "wake.wav"
+        wake_sound_path = ASSETS_DIR / "sounds" / "wake.wav"
         if not wake_sound_path.exists():
             return
 
