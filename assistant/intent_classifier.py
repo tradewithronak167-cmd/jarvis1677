@@ -99,12 +99,7 @@ class IntentClassifier:
             if any(term in target for term in self.DANGEROUS_TERMS):
                 return CommandIntent("unknown", original_text, parameters={"dangerous": "true"})
             if target in self.APP_ALIASES:
-                return CommandIntent(
-                    "open_app",
-                    original_text,
-                    self.APP_ALIASES[target],
-                    requires_confirmation=True,
-                )
+                return CommandIntent("open_app", original_text, self.APP_ALIASES[target])
             if target in self.FOLDER_ALIASES:
                 return CommandIntent("open_folder", original_text, self.FOLDER_ALIASES[target])
             if target in self.WEBSITE_ALIASES:
@@ -113,12 +108,7 @@ class IntentClassifier:
                 return CommandIntent("open_folder", original_text, original_target[7:].strip())
             if self._looks_like_url(target):
                 return CommandIntent("open_website", original_text, original_target)
-            return CommandIntent(
-                "open_app",
-                original_text,
-                original_target,
-                requires_confirmation=True,
-            )
+            return CommandIntent("open_app", original_text, original_target)
 
         if normalized.startswith("close "):
             target = normalized.removeprefix("close ").strip()
@@ -130,13 +120,11 @@ class IntentClassifier:
                     "close_app",
                     original_text,
                     self.APP_ALIASES[target],
-                    requires_confirmation=True,
                 )
             return CommandIntent(
                 "close_app",
                 original_text,
                 original_target,
-                requires_confirmation=True,
             )
 
         if normalized.startswith("set volume to "):

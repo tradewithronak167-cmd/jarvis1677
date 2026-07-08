@@ -3,36 +3,39 @@
 from assistant.command_router import CommandRouter
 
 
-def test_open_chrome_requires_confirmation() -> None:
-    """Open Chrome should ask for confirmation before launching."""
-    result = CommandRouter().handle_user_input("open chrome")
+def test_open_chrome_creates_direct_action() -> None:
+    """Open Chrome should be planned as a direct app action."""
+    plan = CommandRouter().create_plan("open chrome")
 
-    assert result.confirmation_required
-    assert "Confirmation required" in result.message
-
-
-def test_unknown_open_app_requires_confirmation() -> None:
-    """Installed app discovery should confirm before launching unknown app names."""
-    result = CommandRouter().handle_user_input("open whatsapp")
-
-    assert result.confirmation_required
-    assert "Confirmation required" in result.message
+    assert plan.actions[0].intent.category == "open_app"
+    assert not plan.requires_confirmation
 
 
-def test_close_system_app_requires_confirmation() -> None:
-    """Closing a Windows system tool should be supported but confirmed first."""
-    result = CommandRouter().handle_user_input("close task manager")
+def test_unknown_open_app_creates_direct_action() -> None:
+    """Installed app discovery should launch app names directly."""
+    plan = CommandRouter().create_plan("open whatsapp")
 
-    assert result.confirmation_required
-    assert "Confirmation required" in result.message
+    assert plan.actions[0].intent.category == "open_app"
+    assert plan.actions[0].intent.target == "whatsapp"
+    assert not plan.requires_confirmation
 
 
-def test_close_unknown_app_requires_confirmation() -> None:
-    """Closing a discovered app should route through confirmation."""
-    result = CommandRouter().handle_user_input("close whatsapp")
+def test_close_system_app_creates_direct_action() -> None:
+    """Closing a Windows system tool should be supported directly."""
+    plan = CommandRouter().create_plan("close task manager")
 
-    assert result.confirmation_required
-    assert "Confirmation required" in result.message
+    assert plan.actions[0].intent.category == "close_app"
+    assert plan.actions[0].intent.target == "task manager"
+    assert not plan.requires_confirmation
+
+
+def test_close_unknown_app_creates_direct_action() -> None:
+    """Closing a discovered app should route directly."""
+    plan = CommandRouter().create_plan("close whatsapp")
+
+    assert plan.actions[0].intent.category == "close_app"
+    assert plan.actions[0].intent.target == "whatsapp"
+    assert not plan.requires_confirmation
 
 
 def test_delete_file_requires_confirmation() -> None:
