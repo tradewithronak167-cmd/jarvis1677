@@ -3,20 +3,20 @@
 from assistant.command_router import CommandRouter
 
 
-def test_open_chrome_creates_safe_action() -> None:
-    """Open Chrome is planned as a safe action."""
-    plan = CommandRouter().create_plan("open chrome")
+def test_open_chrome_requires_confirmation() -> None:
+    """Open Chrome should ask for confirmation before launching."""
+    result = CommandRouter().handle_user_input("open chrome")
 
-    assert plan.actions[0].intent.category == "open_app"
-    assert not plan.requires_confirmation
+    assert result.confirmation_required
+    assert "Confirmation required" in result.message
 
 
-def test_unknown_open_app_creates_launch_action() -> None:
-    """Installed app discovery should handle app names beyond the fixed alias list."""
-    plan = CommandRouter().create_plan("open whatsapp")
+def test_unknown_open_app_requires_confirmation() -> None:
+    """Installed app discovery should confirm before launching unknown app names."""
+    result = CommandRouter().handle_user_input("open whatsapp")
 
-    assert plan.actions[0].intent.category == "open_app"
-    assert plan.actions[0].intent.target == "whatsapp"
+    assert result.confirmation_required
+    assert "Confirmation required" in result.message
 
 
 def test_close_system_app_requires_confirmation() -> None:
