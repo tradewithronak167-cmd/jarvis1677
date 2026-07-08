@@ -229,9 +229,13 @@ class ChatWindow(ctk.CTkToplevel):
         elapsed_seconds: float | None = None,
     ) -> None:
         """Display router plan/result and update confirmation controls."""
+        is_ai_response = result.action_details.strip() == "1. Ask AI"
         if result.action_details:
-            self._append_display("HI ROLEX Plan", result.action_details)
-        self._append_display("HI ROLEX", result.message)
+            plan_label = "AI Request" if is_ai_response else "Assistant Action"
+            self._append_display(plan_label, result.action_details)
+
+        response_label = "AI Response" if is_ai_response else "Execution Result"
+        self._append_display(response_label, result.message)
         if result.confirmation_required:
             self._set_status("Confirmation required.")
         elif result.success:
