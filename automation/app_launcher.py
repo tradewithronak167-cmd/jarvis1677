@@ -100,6 +100,19 @@ class AppLauncher:
         "cmd command",
         "powershell command",
     )
+    GENERIC_PROCESS_ALIASES: dict[str, list[str]] = {
+        "word": ["WINWORD.EXE"],
+        "microsoft word": ["WINWORD.EXE"],
+        "excel": ["EXCEL.EXE"],
+        "microsoft excel": ["EXCEL.EXE"],
+        "powerpoint": ["POWERPNT.EXE"],
+        "microsoft powerpoint": ["POWERPNT.EXE"],
+        "outlook": ["OUTLOOK.EXE"],
+        "teams": ["ms-teams.exe", "Teams.exe"],
+        "microsoft teams": ["ms-teams.exe", "Teams.exe"],
+        "whatsapp": ["WhatsApp.exe"],
+        "spotify": ["Spotify.exe"],
+    }
 
     def open_application(self, name: str) -> tuple[bool, str]:
         """Open a Windows application by known name or installed app shortcut."""
@@ -131,11 +144,31 @@ class AppLauncher:
 
         app = self.APPLICATIONS.get(normalized_name)
         if app is None:
-            return False, f"Closing unknown apps is not supported yet: {name}"
+            return self._close_generic_application(normalized_name)
 
+        return self._close_process_names(normalized_name, app.process_names)
+
+    def _close_generic_application(self, normalized_name: str) -> tuple[bool, str]:
+        """Close an app discovered by common executable/process-name patterns."""
+        if not normalized_name:
+            return False, "Please include an app name."
+        if self._is_blocked_generic_app(normalized_name):
+            return False, "I cannot close that system tool safely."
+
+        process_names = self._generic_process_names(normalized_name)
+        if not process_names:
+            return False, f"I could not find a safe close target for {normalized_name}."
+        return self._close_process_names(normalized_name, process_names)
+
+    def _close_process_names(
+        self,
+        display_name: str,
+        process_names: list[str],
+    ) -> tuple[bool, str]:
+        """Close matching processes by image name without crashing the app."""
         results: list[str] = []
         closed_any = False
-        for process_name in app.process_names:
+        for process_name in process_names:
             try:
                 completed_process = subprocess.run(
                     ["taskkill", "/IM", process_name, "/F"],
@@ -154,10 +187,10 @@ class AppLauncher:
                 results.append(output)
 
         if closed_any:
-            return True, f"Closed {normalized_name}."
+            return True, f"Closed {display_name}."
 
         detail = " ".join(results).strip()
-        return False, detail or f"{normalized_name} is not running."
+        return False, detail or f"{display_name} is not running."
 
     def _open_installed_application(self, name: str) -> tuple[bool, str]:
         """Try to open an installed Windows app that is not in the known list."""
@@ -334,6 +367,12 @@ class AppLauncher:
             if resolved is not None:
                 commands.append([resolved])
         return self._dedupe_generic_commands(commands)
+
+    def _generic_process_names(self, normalized_name: str) -> list[str]:
+        """Return process-name candidates for generic close commands."""
+        if normalized_name in self.GENERIC_PROCESS_ALIASES:
+            return self.GENERIC_PROCESS_ALIASES[normalized_name]
+        return self._possible_executable_names(normalized_name)
 
     def _possible_executable_names(self, normalized_name: str) -> list[str]:
         """Create common executable filename variants from a spoken app name."""

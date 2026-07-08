@@ -112,6 +112,9 @@ class IntentClassifier:
 
         if normalized.startswith("close "):
             target = normalized.removeprefix("close ").strip()
+            original_target = original_text[len("close ") :].strip()
+            if any(term in target for term in self.DANGEROUS_TERMS):
+                return CommandIntent("unknown", original_text, parameters={"dangerous": "true"})
             if target in self.APP_ALIASES:
                 return CommandIntent(
                     "close_app",
@@ -119,6 +122,12 @@ class IntentClassifier:
                     self.APP_ALIASES[target],
                     requires_confirmation=True,
                 )
+            return CommandIntent(
+                "close_app",
+                original_text,
+                original_target,
+                requires_confirmation=True,
+            )
 
         if normalized.startswith("set volume to "):
             percent = self._extract_percent(normalized)

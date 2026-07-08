@@ -27,6 +27,14 @@ def test_close_system_app_requires_confirmation() -> None:
     assert "Confirmation required" in result.message
 
 
+def test_close_unknown_app_requires_confirmation() -> None:
+    """Closing a discovered app should route through confirmation."""
+    result = CommandRouter().handle_user_input("close whatsapp")
+
+    assert result.confirmation_required
+    assert "Confirmation required" in result.message
+
+
 def test_delete_file_requires_confirmation() -> None:
     """Delete file must not execute without confirmation."""
     result = CommandRouter().handle_user_input("delete file test.txt")

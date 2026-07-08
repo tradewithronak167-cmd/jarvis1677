@@ -51,6 +51,14 @@ def test_close_system_app_command() -> None:
     assert parsed.target == "resource monitor"
 
 
+def test_close_unknown_app_routes_to_application_closer() -> None:
+    """Any close-app command should reach the app closer."""
+    parsed = CommandParser().parse("close whatsapp")
+
+    assert parsed.action == "close_application"
+    assert parsed.target == "whatsapp"
+
+
 def test_open_unknown_app_routes_to_application_launcher() -> None:
     """Any open-app command should reach the launcher for installed app discovery."""
     parsed = CommandParser().parse("open whatsapp")

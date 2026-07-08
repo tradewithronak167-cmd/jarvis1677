@@ -146,9 +146,15 @@ class CommandParser:
 
         if normalized_command.startswith("close "):
             target = normalized_command.removeprefix("close ").strip()
+            original_target = command.strip()[len("close ") :].strip()
             if target in self.APP_ALIASES:
                 app_name = self.APP_ALIASES[target]
                 return ParsedCommand("close_application", app_name, f"Closing {target}")
+            return ParsedCommand(
+                "close_application",
+                original_target,
+                f"Closing {original_target}",
+            )
 
         return ParsedCommand(
             "unknown",

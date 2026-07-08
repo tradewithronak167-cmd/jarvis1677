@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from subprocess import CompletedProcess
 
 from automation.app_launcher import AppLauncher
 
@@ -73,3 +74,20 @@ def test_generic_start_menu_app_can_launch(monkeypatch, tmp_path: Path) -> None:
     assert success
     assert opened_paths == [shortcut]
     assert "Launch requested" in message
+
+
+def test_generic_app_can_close_by_process_alias(monkeypatch) -> None:
+    """Generic close should support common app process aliases."""
+    commands: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        return CompletedProcess(command, 0, stdout="closed", stderr="")
+
+    monkeypatch.setattr("automation.app_launcher.subprocess.run", fake_run)
+
+    success, message = AppLauncher().close_application("whatsapp")
+
+    assert success
+    assert commands[0][:3] == ["taskkill", "/IM", "WhatsApp.exe"]
+    assert "Closed whatsapp" in message

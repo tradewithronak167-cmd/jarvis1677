@@ -52,6 +52,7 @@ class MainWindow(ctk.CTk):
         self.status_value_label: ctk.CTkLabel | None = None
         self.voice_animation: VoiceAnimation | None = None
         self.chat_textbox: ctk.CTkTextbox | None = None
+        self._is_closing = False
 
         self._configure_window()
         self.create_header()
@@ -291,6 +292,8 @@ class MainWindow(ctk.CTk):
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""
+        if self._is_closing:
+            return
         self.after(0, lambda: self._apply_status(status))
 
     def _apply_status(self, status: str) -> None:
@@ -314,12 +317,16 @@ class MainWindow(ctk.CTk):
 
     def display_recognized_command(self, command: str) -> None:
         """Route a recognized voice command and display the result."""
+        if self._is_closing:
+            return
         command_result = self.command_router.handle_user_input(command, source="voice")
         self.after(0, lambda: self._append_router_result(command_result))
         self._speak_short_feedback(command_result)
 
     def display_wake_error(self, message: str) -> None:
         """Display wake-listener errors without crashing the GUI."""
+        if self._is_closing:
+            return
         self.after(0, lambda: self._append_chat_message("Voice System", message))
 
     def _append_chat_message(self, sender: str, message: str) -> None:
@@ -366,8 +373,58 @@ class MainWindow(ctk.CTk):
 
     def close_application(self) -> None:
         """Close the HI ROLEX application."""
+        if self._is_closing:
+            return
+
+        self._is_closing = True
+        try:
+            self.withdraw()
+        except Exception:
+            pass
+
+        self._stop_background_services()
+        self._close_child_windows()
+
+        try:
+            self.quit()
+        except Exception:
+            pass
+
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
+    def _stop_background_services(self) -> None:
+        """Stop voice, wake-word, and animation services during shutdown."""
         if self.voice_animation is not None:
-            self.voice_animation.stop()
+            try:
+                self.voice_animation.stop()
+            except Exception:
+                pass
         if self.wake_word_manager is not None:
-            self.wake_word_manager.stop()
-        self.destroy()
+            try:
+                self.wake_word_manager.stop()
+            except Exception:
+                pass
+        try:
+            self.speech_manager.stop()
+        except Exception:
+            pass
+
+    def _close_child_windows(self) -> None:
+        """Destroy open child windows before the root window closes."""
+        windows = (
+            self.chat_window,
+            self.file_manager_window,
+            self.hardware_window,
+            self.memory_window,
+            self.settings_window,
+            self.voice_test_window,
+        )
+        for window in windows:
+            try:
+                if window is not None and window.winfo_exists():
+                    window.destroy()
+            except Exception:
+                continue
