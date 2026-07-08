@@ -3,6 +3,7 @@
 from tkinter import messagebox
 
 from gui.main_window import MainWindow
+from gui.splash_window import SplashWindow
 from utils.app_paths import ensure_required_directories
 from utils.error_handler import show_user_friendly_error
 from utils.logger import get_logger
@@ -16,10 +17,17 @@ class HiRolexApp:
         self.logger = get_logger()
         self.logger.info("HI ROLEX app startup")
         self.window = MainWindow()
+        self.window.withdraw()
+        self.splash = SplashWindow(self.window, self._show_main_window)
 
     def run(self) -> None:
         """Start the GUI event loop."""
         self.window.mainloop()
+
+    def _show_main_window(self) -> None:
+        """Show the main window after the splash screen finishes."""
+        self.window.deiconify()
+        self.window.focus()
 
 
 def main() -> None:
