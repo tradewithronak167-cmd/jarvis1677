@@ -101,13 +101,12 @@ class ChatWindow(ctk.CTkToplevel):
 
         self.input_box = ctk.CTkTextbox(input_frame, height=70, wrap="word")
         self.input_box.grid(row=0, column=0, padx=24, pady=(18, 12), sticky="ew")
+        self.input_box.bind("<Return>", self._handle_enter_key)
+        self.input_box.bind("<Shift-Return>", self._handle_shift_enter_key)
 
         controls = ctk.CTkFrame(input_frame, fg_color="transparent")
         controls.grid(row=1, column=0, padx=24, pady=(0, 18), sticky="ew")
-        controls.grid_columnconfigure(2, weight=1)
-
-        send_button = ctk.CTkButton(controls, text="Send", command=self.send_message)
-        send_button.grid(row=0, column=0, padx=(0, 10), sticky="w")
+        controls.grid_columnconfigure(1, weight=1)
 
         clear_button = ctk.CTkButton(
             controls,
@@ -116,14 +115,14 @@ class ChatWindow(ctk.CTkToplevel):
             fg_color="#374151",
             hover_color="#4B5563",
         )
-        clear_button.grid(row=0, column=1, padx=(0, 10), sticky="w")
+        clear_button.grid(row=0, column=0, padx=(0, 10), sticky="w")
 
         speak_checkbox = ctk.CTkCheckBox(
             controls,
             text="Speak AI response",
             variable=self.speak_response_var,
         )
-        speak_checkbox.grid(row=0, column=2, sticky="w")
+        speak_checkbox.grid(row=0, column=1, sticky="w")
 
         self.confirm_button = ctk.CTkButton(
             controls,
@@ -132,7 +131,7 @@ class ChatWindow(ctk.CTkToplevel):
             fg_color="#15803D",
             hover_color="#166534",
         )
-        self.confirm_button.grid(row=0, column=3, padx=(10, 6), sticky="e")
+        self.confirm_button.grid(row=0, column=2, padx=(10, 6), sticky="e")
         self.confirm_button.grid_remove()
 
         self.cancel_button = ctk.CTkButton(
@@ -142,7 +141,7 @@ class ChatWindow(ctk.CTkToplevel):
             fg_color="#7F1D1D",
             hover_color="#991B1B",
         )
-        self.cancel_button.grid(row=0, column=4, padx=(6, 0), sticky="e")
+        self.cancel_button.grid(row=0, column=3, padx=(6, 0), sticky="e")
         self.cancel_button.grid_remove()
 
     def load_previous_conversation(self) -> None:
@@ -175,6 +174,15 @@ class ChatWindow(ctk.CTkToplevel):
             daemon=True,
         )
         thread.start()
+
+    def _handle_enter_key(self, event: object) -> str:
+        """Send the current message when Enter is pressed."""
+        self.send_message()
+        return "break"
+
+    def _handle_shift_enter_key(self, event: object) -> None:
+        """Allow Shift+Enter to insert a new line."""
+        return None
 
     def confirm_pending_action(self) -> None:
         """Confirm and execute the pending command-router action."""
