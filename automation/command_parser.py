@@ -35,6 +35,11 @@ class CommandParser:
         "control panel": "control panel",
         "device manager": "device manager",
         "system information": "system information",
+        "system info": "system information",
+        "resource monitor": "resource monitor",
+        "performance monitor": "performance monitor",
+        "event viewer": "event viewer",
+        "eventvwr": "event viewer",
     }
     FOLDER_ALIASES: dict[str, str] = {
         "downloads": "downloads",

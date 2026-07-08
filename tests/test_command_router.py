@@ -19,6 +19,14 @@ def test_unknown_open_app_creates_launch_action() -> None:
     assert plan.actions[0].intent.target == "whatsapp"
 
 
+def test_close_system_app_requires_confirmation() -> None:
+    """Closing a Windows system tool should be supported but confirmed first."""
+    result = CommandRouter().handle_user_input("close task manager")
+
+    assert result.confirmation_required
+    assert "Confirmation required" in result.message
+
+
 def test_delete_file_requires_confirmation() -> None:
     """Delete file must not execute without confirmation."""
     result = CommandRouter().handle_user_input("delete file test.txt")

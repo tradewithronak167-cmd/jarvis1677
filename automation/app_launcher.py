@@ -79,6 +79,15 @@ class AppLauncher:
             ["mmc.exe"],
         ),
         "system information": AppDefinition([["msinfo32.exe"]], ["msinfo32.exe"]),
+        "resource monitor": AppDefinition([["resmon.exe"]], ["resmon.exe"]),
+        "performance monitor": AppDefinition(
+            [["perfmon.exe"]],
+            ["perfmon.exe", "mmc.exe"],
+        ),
+        "event viewer": AppDefinition(
+            [["eventvwr.exe"], ["mmc.exe", "eventvwr.msc"]],
+            ["eventvwr.exe", "mmc.exe"],
+        ),
     }
     BLOCKED_GENERIC_APPS: tuple[str, ...] = (
         "regedit",

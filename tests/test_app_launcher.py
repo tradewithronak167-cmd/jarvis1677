@@ -29,9 +29,33 @@ def test_unsupported_application_returns_error() -> None:
 def test_system_tools_have_launch_commands() -> None:
     """Safe Windows system tools should be registered for chat launching."""
     launcher = AppLauncher()
-    for app_name in ("task manager", "settings", "device manager", "system information"):
+    for app_name in (
+        "task manager",
+        "settings",
+        "device manager",
+        "system information",
+        "resource monitor",
+        "performance monitor",
+        "event viewer",
+    ):
         app = launcher.APPLICATIONS[app_name]
         assert launcher._candidate_commands(app_name, app)
+
+
+def test_system_tools_have_close_process_names() -> None:
+    """Safe Windows system tools should also define close targets."""
+    launcher = AppLauncher()
+    for app_name in (
+        "task manager",
+        "settings",
+        "control panel",
+        "device manager",
+        "system information",
+        "resource monitor",
+        "performance monitor",
+        "event viewer",
+    ):
+        assert launcher.APPLICATIONS[app_name].process_names
 
 
 def test_generic_start_menu_app_can_launch(monkeypatch, tmp_path: Path) -> None:
