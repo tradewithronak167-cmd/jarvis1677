@@ -55,6 +55,8 @@ class HealthCheck:
         "google.generativeai",
         "psutil",
         "pyttsx3",
+        "pyaudio",
+        "sounddevice",
         "speech_recognition",
     )
 
