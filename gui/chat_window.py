@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 import customtkinter as ctk
 
@@ -212,15 +213,21 @@ class ChatWindow(ctk.CTkToplevel):
 
     def _route_command_in_background(self, user_message: str) -> None:
         """Route a command without blocking the GUI."""
+        started_at = time.perf_counter()
         result = self.command_router.handle_user_input(user_message, source="chat")
-        self.after(0, lambda: self._handle_command_result(result))
+        elapsed_seconds = time.perf_counter() - started_at
+        self.after(0, lambda: self._handle_command_result(result, elapsed_seconds))
 
     def _confirm_in_background(self) -> None:
         """Execute a confirmed pending action without blocking the GUI."""
         result = self.command_router.confirm_pending_action()
         self.after(0, lambda: self._handle_command_result(result))
 
-    def _handle_command_result(self, result: CommandResult) -> None:
+    def _handle_command_result(
+        self,
+        result: CommandResult,
+        elapsed_seconds: float | None = None,
+    ) -> None:
         """Display router plan/result and update confirmation controls."""
         if result.action_details:
             self._append_display("HI ROLEX Plan", result.action_details)
@@ -228,9 +235,10 @@ class ChatWindow(ctk.CTkToplevel):
         if result.confirmation_required:
             self._set_status("Confirmation required.")
         elif result.success:
-            self._set_status("Completed successfully.")
+            self._set_status(self._completion_status("Completed", elapsed_seconds))
         else:
-            self._set_status("AI unavailable." if "AI unavailable" in result.message else "Request not completed.")
+            status = "AI unavailable." if "AI unavailable" in result.message else "Request not completed."
+            self._set_status(self._completion_status(status, elapsed_seconds))
 
         if result.confirmation_required:
             self._show_confirmation_controls()
@@ -297,3 +305,13 @@ class ChatWindow(ctk.CTkToplevel):
         if mode == "Offline":
             return f"Offline AI mode. Ollama model: {self.ai_manager.offline_ai.get_model()}."
         return "Hybrid Mode. Online AI first, Offline AI fallback."
+
+    def _completion_status(
+        self,
+        message: str,
+        elapsed_seconds: float | None,
+    ) -> str:
+        """Return a status message with optional response timing."""
+        if elapsed_seconds is None:
+            return message
+        return f"{message} in {elapsed_seconds:.1f}s."

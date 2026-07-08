@@ -104,9 +104,7 @@ class AIManager:
             return "Using Online AI..."
         if mode == "Offline":
             return "Using Offline AI..."
-        if self.is_online_available():
-            return "Using Online AI..."
-        return "Using Offline AI..."
+        return "Hybrid Mode is choosing the fastest available AI..."
 
     def _ask_online(self, message: str) -> str:
         """Use Gemini online AI only."""

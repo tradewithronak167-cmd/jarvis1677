@@ -17,9 +17,9 @@ class OnlineAI:
         "Online AI is not configured. Please add GEMINI_API_KEY to your .env file."
     )
     PREFERRED_MODELS: tuple[str, ...] = (
-        "gemini-flash-latest",
-        "gemini-2.5-flash",
         "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
     )
 
     def __init__(
@@ -60,13 +60,19 @@ class OnlineAI:
 
     def _generate_with_available_model(self, genai: object, prompt: str) -> str:
         """Generate text using the first supported Gemini model available."""
-        candidate_models = [*self.PREFERRED_MODELS, *self._list_supported_models(genai)]
+        candidate_models = [self.model_name, *self.PREFERRED_MODELS]
 
         last_error = ""
         for model_name in dict.fromkeys(candidate_models):
             try:
                 model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
+                response = model.generate_content(
+                    prompt,
+                    generation_config={
+                        "max_output_tokens": 500,
+                        "temperature": 0.5,
+                    },
+                )
                 response_text = getattr(response, "text", "").strip()
                 if response_text:
                     self.model_name = model_name
