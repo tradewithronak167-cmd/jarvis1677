@@ -1,0 +1,20 @@
+{
+    "app_title": "HI ROLEX",
+    "status": "Status",
+    "status_ready": "Ready",
+    "settings": "Settings",
+    "chat": "Chat",
+    "microphone": "Microphone",
+    "files": "Files",
+    "exit": "Exit",
+    "language": "Language",
+    "theme": "Theme",
+    "ai_mode": "AI Mode",
+    "offline_model": "Offline Model",
+    "wake_word": "Wake Word",
+    "voice": "Voice",
+    "speaker": "Speaker",
+    "save": "Save",
+    "cancel": "Cancel",
+    "settings_saved": "Settings saved successfully."
+}

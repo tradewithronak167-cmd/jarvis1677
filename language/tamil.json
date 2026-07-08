@@ -1,0 +1,20 @@
+{
+    "app_title": "HI ROLEX",
+    "status": "நிலை",
+    "status_ready": "தயார்",
+    "settings": "அமைப்புகள்",
+    "chat": "அரட்டை",
+    "microphone": "ஒலிவாங்கி",
+    "files": "கோப்புகள்",
+    "exit": "வெளியேறு",
+    "language": "மொழி",
+    "theme": "தீம்",
+    "ai_mode": "AI முறை",
+    "offline_model": "Offline Model",
+    "wake_word": "விழிப்பு சொல்",
+    "voice": "குரல்",
+    "speaker": "ஒலிபெருக்கி",
+    "save": "சேமி",
+    "cancel": "ரத்து செய்",
+    "settings_saved": "அமைப்புகள் வெற்றிகரமாக சேமிக்கப்பட்டன."
+}

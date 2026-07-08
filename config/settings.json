@@ -1,0 +1,10 @@
+{
+    "language": "English",
+    "theme": "Light",
+    "ai_mode": "Hybrid",
+    "offline_model": "qwen2.5:3b",
+    "wake_word": "Hi Rolex",
+    "voice": "Female",
+    "microphone": "Default",
+    "speaker": "Default"
+}
