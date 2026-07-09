@@ -161,7 +161,7 @@ class MainWindow(ctk.CTk):
 
         mode_label = ctk.CTkLabel(
             status_frame,
-            text="Chat-first mode - use Talk when you want voice",
+            text="Default assistant mode - greets and listens automatically",
             font=ctk.CTkFont(size=13),
             text_color="#94A3B8",
         )
@@ -195,7 +195,7 @@ class MainWindow(ctk.CTk):
 
         self.status_detail_label = ctk.CTkLabel(
             center_frame,
-            text="Type for fast chat, or press Talk for a voice command.",
+            text="I will greet you, then listen for your command.",
             font=ctk.CTkFont(size=17),
             text_color="#CBD5E1",
             wraplength=760,
@@ -229,19 +229,6 @@ class MainWindow(ctk.CTk):
             font=ctk.CTkFont(size=15, weight="bold"),
         )
         run_button.grid(row=0, column=1, padx=(0, 10))
-
-        talk_button = ctk.CTkButton(
-            action_frame,
-            text="Talk",
-            command=self.listen_once_from_dashboard,
-            width=96,
-            height=44,
-            corner_radius=8,
-            fg_color="#15803D",
-            hover_color="#166534",
-            font=ctk.CTkFont(size=15, weight="bold"),
-        )
-        talk_button.grid(row=0, column=2)
 
     def create_toolbar(self) -> None:
         """Create the bottom command toolbar."""
@@ -428,10 +415,11 @@ class MainWindow(ctk.CTk):
         ).start()
 
     def _speak_greeting_then_listen(self, text: str) -> None:
-        """Speak the startup greeting and return to Ready."""
+        """Speak the startup greeting, then listen once by default."""
         self.speech_manager.speak(text)
         self.set_status("Ready")
-        self._set_status_detail("Ready. Type for fast chat, or press Talk for voice.")
+        self._set_status_detail("Listening for your command...")
+        self.after(500, self.listen_once_from_dashboard)
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""

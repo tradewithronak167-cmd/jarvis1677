@@ -21,6 +21,21 @@ class SettingsWindow(ctk.CTkToplevel):
 
     THEME_OPTIONS: list[str] = ["Dark", "Light"]
     AI_MODE_OPTIONS: list[str] = ["Offline", "Online", "Hybrid"]
+    VOICE_STYLE_OPTIONS: list[str] = [
+        "Default",
+        "Male",
+        "Male - Deep",
+        "Male - Smooth",
+        "Male - Light",
+        "Male - Slight",
+        "Male - Dim",
+        "Female",
+        "Female - Deep",
+        "Female - Smooth",
+        "Female - Light",
+        "Female - Slight",
+        "Female - Dim",
+    ]
 
     def __init__(
         self,
@@ -275,14 +290,13 @@ class SettingsWindow(ctk.CTkToplevel):
 
     def _build_voice_options(self) -> list[str]:
         """Return friendly voice choices plus installed Windows voices."""
-        base_options = ["Default", "Male", "Female"]
         installed_voices = TextToSpeech(self.settings_manager).list_voices()
         clean_voices = [
             voice
             for voice in installed_voices
             if voice and "not available" not in voice.casefold()
         ]
-        options = [*base_options]
+        options = [*self.VOICE_STYLE_OPTIONS]
         for voice in clean_voices:
             if voice not in options:
                 options.append(voice)

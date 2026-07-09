@@ -11,6 +11,21 @@ from utils.logger import get_logger
 class TextToSpeech:
     """Speaks text using the local Windows text-to-speech engine."""
 
+    VOICE_STYLE_SETTINGS: dict[str, tuple[str | None, int, float]] = {
+        "male": ("male", 170, 0.95),
+        "male - deep": ("male", 135, 1.0),
+        "male - smooth": ("male", 160, 0.95),
+        "male - light": ("male", 190, 0.9),
+        "male - slight": ("male", 185, 0.88),
+        "male - dim": ("male", 140, 0.75),
+        "female": ("female", 175, 0.95),
+        "female - deep": ("female", 145, 1.0),
+        "female - smooth": ("female", 165, 0.95),
+        "female - light": ("female", 195, 0.9),
+        "female - slight": ("female", 190, 0.88),
+        "female - dim": ("female", 150, 0.75),
+    }
+
     def __init__(self, settings_manager: SettingsManager) -> None:
         self.settings_manager = settings_manager
         self.engine = None
@@ -55,11 +70,18 @@ class TextToSpeech:
             return
 
         preferred_voice_lower = preferred_voice.lower()
+        style = self.VOICE_STYLE_SETTINGS.get(preferred_voice_lower)
 
         try:
             voices = self.engine.getProperty("voices")
+            if style is not None:
+                gender, rate, volume = style
+                self.set_rate(rate)
+                self.set_volume(volume)
+                self._select_gender_voice(voices, gender)
+                return
+
             for voice in voices:
-                voice_text = f"{voice.name} {voice.id}".lower()
                 if preferred_voice_lower == str(voice.name).lower():
                     self.engine.setProperty("voice", voice.id)
                     return
@@ -70,6 +92,17 @@ class TextToSpeech:
                     return
         except Exception:
             return
+
+    def _select_gender_voice(self, voices: object, gender: str | None) -> None:
+        """Pick the closest installed Windows voice for a friendly gender/style option."""
+        if gender is None:
+            return
+
+        for voice in voices:
+            voice_text = f"{getattr(voice, 'name', '')} {getattr(voice, 'id', '')}".lower()
+            if gender in voice_text:
+                self.engine.setProperty("voice", voice.id)
+                return
 
     def set_rate(self, rate: int) -> None:
         """Set speech speed."""
