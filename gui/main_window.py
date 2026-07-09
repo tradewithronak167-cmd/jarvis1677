@@ -161,7 +161,7 @@ class MainWindow(ctk.CTk):
 
         mode_label = ctk.CTkLabel(
             status_frame,
-            text="Voice-first mode - no wake word required",
+            text="Chat-first mode - use Talk when you want voice",
             font=ctk.CTkFont(size=13),
             text_color="#94A3B8",
         )
@@ -195,7 +195,7 @@ class MainWindow(ctk.CTk):
 
         self.status_detail_label = ctk.CTkLabel(
             center_frame,
-            text="Press Talk or type a command. I will speak the result.",
+            text="Type for fast chat, or press Talk for a voice command.",
             font=ctk.CTkFont(size=17),
             text_color="#CBD5E1",
             wraplength=760,
@@ -380,7 +380,6 @@ class MainWindow(ctk.CTk):
         """Run a command without freezing the dashboard."""
         result = self.command_router.handle_user_input(command, source=source)
         self.after(0, lambda: self._show_voice_result(result))
-        self._speak_feedback_blocking(result)
         self.set_status("Ready")
 
     def _listen_once_in_background(self) -> None:
@@ -432,7 +431,7 @@ class MainWindow(ctk.CTk):
         """Speak the startup greeting and return to Ready."""
         self.speech_manager.speak(text)
         self.set_status("Ready")
-        self._set_status_detail("Ready. Press Talk or type a command.")
+        self._set_status_detail("Ready. Type for fast chat, or press Talk for voice.")
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""

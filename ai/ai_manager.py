@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+import queue
+import threading
+
 from ai.basic_ai import BasicAI
 from ai.conversation_manager import ConversationManager
 from ai.internet_checker import InternetChecker
@@ -16,6 +20,9 @@ from memory.profile_manager import ProfileManager
 
 class AIManager:
     """Routes chat messages to the available AI provider."""
+
+    ONLINE_TIMEOUT_SECONDS: float = 18.0
+    OFFLINE_TIMEOUT_SECONDS: float = 25.0
 
     def __init__(
         self,
@@ -117,7 +124,11 @@ class AIManager:
             return "Internet connection is unavailable. Online AI cannot respond."
 
         self.last_provider_used = "Online AI"
-        return self.online_ai.generate_response(message)
+        return self._run_provider_with_timeout(
+            lambda: self.online_ai.generate_response(message),
+            self.ONLINE_TIMEOUT_SECONDS,
+            "Online AI is taking too long. Please try again, or switch to Offline mode.",
+        )
 
     def _ask_offline(self, message: str) -> str:
         """Use Ollama offline AI only."""
@@ -126,19 +137,31 @@ class AIManager:
             return self.offline_ai.UNAVAILABLE_MESSAGE
 
         self.last_provider_used = "Offline AI"
-        return self.offline_ai.generate_response(message)
+        return self._run_provider_with_timeout(
+            lambda: self.offline_ai.generate_response(message),
+            self.OFFLINE_TIMEOUT_SECONDS,
+            "Offline AI is taking too long. Please check the Ollama model.",
+        )
 
     def _ask_hybrid(self, message: str) -> str:
         """Use OnlineAI when available, otherwise fallback to OfflineAI."""
         if self.is_online_available():
             self.last_provider_used = "Online AI"
-            response = self.online_ai.generate_response(message)
+            response = self._run_provider_with_timeout(
+                lambda: self.online_ai.generate_response(message),
+                self.ONLINE_TIMEOUT_SECONDS,
+                "Online AI error: response timed out.",
+            )
             if not response.startswith("Online AI error:"):
                 return response
 
         if self.offline_ai.is_available():
             self.last_provider_used = "Offline AI"
-            return self.offline_ai.generate_response(message)
+            return self._run_provider_with_timeout(
+                lambda: self.offline_ai.generate_response(message),
+                self.OFFLINE_TIMEOUT_SECONDS,
+                "Offline AI is taking too long. Please check the Ollama model.",
+            )
 
         self.last_provider_used = "AI unavailable"
         return (
@@ -146,6 +169,28 @@ class AIManager:
             "and run a local model for Offline AI.\n\n"
             f"Basic answer: {self.basic_ai.generate_response(message)}"
         )
+
+    def _run_provider_with_timeout(
+        self,
+        provider_call: Callable[[], str],
+        timeout_seconds: float,
+        timeout_message: str,
+    ) -> str:
+        """Run a provider call in a daemon thread and return before the UI feels stuck."""
+        result_queue: queue.Queue[str] = queue.Queue(maxsize=1)
+
+        def worker() -> None:
+            try:
+                result_queue.put(provider_call())
+            except Exception as error:
+                result_queue.put(f"AI provider error: {error}")
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        try:
+            return result_queue.get(timeout=timeout_seconds)
+        except queue.Empty:
+            return timeout_message
 
     def _handle_memory_command(self, message: str) -> str | None:
         """Handle explicit memory commands typed in chat."""

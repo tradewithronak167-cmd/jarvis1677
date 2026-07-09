@@ -1,5 +1,7 @@
 """AI manager tests for HI ROLEX."""
 
+import time
+
 from ai.ai_manager import AIManager
 from ai.offline_ai import OfflineAI
 from ai.prompt_builder import PromptBuilder
@@ -27,6 +29,29 @@ def test_missing_api_key_returns_friendly_message(tmp_path) -> None:
     response = manager.ask("hello")
 
     assert "Online AI is not configured" in response
+
+
+def test_online_ai_timeout_returns_friendly_message(tmp_path) -> None:
+    """Slow online providers should not make chat wait forever."""
+    settings_manager = SettingsManager(tmp_path / "settings.json")
+    settings = settings_manager.create_default_settings()
+    settings["ai_mode"] = "Online"
+    settings_manager.save_settings(settings)
+    conversation = ConversationManager(tmp_path / "history.json")
+    manager = AIManager(conversation, settings_manager)
+    manager.ONLINE_TIMEOUT_SECONDS = 0.01
+    manager.online_ai.api_key = "test-key"
+    manager.internet_checker.is_connected = lambda: True
+
+    def slow_response(message: str) -> str:
+        time.sleep(0.2)
+        return "late response"
+
+    manager.online_ai.generate_response = slow_response
+
+    response = manager.ask("hello")
+
+    assert "taking too long" in response
 
 
 def test_offline_ai_unavailable_returns_friendly_message(tmp_path) -> None:

@@ -36,7 +36,12 @@ class ChatWindow(ctk.CTkToplevel):
         self.status_label: ctk.CTkLabel | None = None
         self.confirm_button: ctk.CTkButton | None = None
         self.cancel_button: ctk.CTkButton | None = None
+        self.listen_button: ctk.CTkButton | None = None
+        self.speak_button: ctk.CTkButton | None = None
         self.voice_animation: VoiceAnimation | None = None
+        self.last_assistant_message: str = ""
+        self._is_processing = False
+        self._is_listening = False
 
         self._configure_window()
         self.create_layout()
@@ -142,6 +147,24 @@ class ChatWindow(ctk.CTkToplevel):
         )
         clear_button.grid(row=0, column=0, padx=(0, 10), sticky="w")
 
+        self.listen_button = ctk.CTkButton(
+            controls,
+            text="Listen",
+            command=self.listen_once,
+            fg_color="#15803D",
+            hover_color="#166534",
+        )
+        self.listen_button.grid(row=0, column=1, padx=(0, 10), sticky="w")
+
+        self.speak_button = ctk.CTkButton(
+            controls,
+            text="Speak Last",
+            command=self.speak_last_response,
+            fg_color="#5B21B6",
+            hover_color="#6D28D9",
+        )
+        self.speak_button.grid(row=0, column=2, padx=(0, 10), sticky="w")
+
         self.confirm_button = ctk.CTkButton(
             controls,
             text="Confirm",
@@ -149,7 +172,7 @@ class ChatWindow(ctk.CTkToplevel):
             fg_color="#15803D",
             hover_color="#166534",
         )
-        self.confirm_button.grid(row=0, column=2, padx=(10, 6), sticky="e")
+        self.confirm_button.grid(row=0, column=3, padx=(10, 6), sticky="e")
         self.confirm_button.grid_remove()
 
         self.cancel_button = ctk.CTkButton(
@@ -159,7 +182,7 @@ class ChatWindow(ctk.CTkToplevel):
             fg_color="#7F1D1D",
             hover_color="#991B1B",
         )
-        self.cancel_button.grid(row=0, column=3, padx=(6, 0), sticky="e")
+        self.cancel_button.grid(row=0, column=4, padx=(6, 0), sticky="e")
         self.cancel_button.grid_remove()
 
     def load_previous_conversation(self) -> None:
@@ -175,11 +198,16 @@ class ChatWindow(ctk.CTkToplevel):
 
     def send_message(self) -> None:
         """Send the user's message to the AI manager."""
+        if self._is_processing:
+            self._set_status("Still working on the previous request...")
+            return
+
         user_message = self._get_input_text()
         if not user_message:
             self._set_status("Please type a message first.")
             return
 
+        self._is_processing = True
         self._clear_input()
         self._append_display("You", user_message)
         if self._is_local_task(user_message):
@@ -223,6 +251,10 @@ class ChatWindow(ctk.CTkToplevel):
 
     def clear_chat(self) -> None:
         """Clear the display and saved conversation history."""
+        if self._is_processing:
+            self._set_status("Please wait for the current response to finish.")
+            return
+
         self.conversation_manager.clear_history()
         if self.chat_display is not None:
             self.chat_display.configure(state="normal")
@@ -230,6 +262,38 @@ class ChatWindow(ctk.CTkToplevel):
             self.chat_display.configure(state="disabled")
         self._append_display("System", "Chat cleared.")
         self._set_status(self._status_text())
+
+    def listen_once(self) -> None:
+        """Listen for one spoken chat message and send it when recognized."""
+        if self.speech_manager is None:
+            self._set_status("Voice system is not connected to this chat window.")
+            return
+        if self._is_processing:
+            self._set_status("Please wait for the current response to finish.")
+            return
+        if self._is_listening:
+            self._set_status("Already listening...")
+            return
+
+        self._is_listening = True
+        self._set_status("Listening...")
+        thread = threading.Thread(target=self._listen_once_in_background, daemon=True)
+        thread.start()
+
+    def speak_last_response(self) -> None:
+        """Speak the most recent assistant answer on demand."""
+        if self.speech_manager is None:
+            self._set_status("Voice system is not connected to this chat window.")
+            return
+        if not self.last_assistant_message.strip():
+            self._set_status("There is no assistant response to speak yet.")
+            return
+
+        threading.Thread(
+            target=self._speak_and_return_ready,
+            args=(self.last_assistant_message[:900],),
+            daemon=True,
+        ).start()
 
     def _route_command_in_background(self, user_message: str) -> None:
         """Route a command without blocking the GUI."""
@@ -242,6 +306,30 @@ class ChatWindow(ctk.CTkToplevel):
         """Execute a confirmed pending action without blocking the GUI."""
         result = self.command_router.confirm_pending_action()
         self.after(0, lambda: self._handle_command_result(result))
+
+    def _listen_once_in_background(self) -> None:
+        """Capture one microphone message without freezing the chat window."""
+        if self.speech_manager is None:
+            self.after(0, lambda: self._handle_listen_result(""))
+            return
+
+        recognized_text = self.speech_manager.listen_once()
+        self.after(0, lambda: self._handle_listen_result(recognized_text))
+
+    def _handle_listen_result(self, recognized_text: str) -> None:
+        """Place recognized speech into the input box and send it."""
+        self._is_listening = False
+        cleaned_text = recognized_text.strip()
+        if not cleaned_text or self._is_recognition_error(cleaned_text):
+            self._set_status(
+                f"Microphone did not capture a command: {cleaned_text or 'No audio.'}"
+            )
+            return
+
+        if self.input_box is not None:
+            self.input_box.delete("1.0", "end")
+            self.input_box.insert("1.0", cleaned_text)
+        self.send_message()
 
     def _handle_command_result(
         self,
@@ -256,6 +344,9 @@ class ChatWindow(ctk.CTkToplevel):
 
         response_label = "Assistant" if is_ai_response else "Execution Result"
         self._append_display(response_label, result.message)
+        if is_ai_response:
+            self.last_assistant_message = result.message
+
         if result.confirmation_required:
             self._set_status("Confirmation required.")
         elif result.success:
@@ -269,15 +360,13 @@ class ChatWindow(ctk.CTkToplevel):
         else:
             self._hide_confirmation_controls()
 
-        if is_ai_response and result.success:
-            self._speak_ai_response(result.message)
+        self._is_processing = False
 
     def _handle_ai_response(self, response: str) -> None:
         """Display and optionally speak the AI response."""
         self._append_display("Assistant", response)
+        self.last_assistant_message = response
         self._set_status(f"{self.ai_manager.last_provider_used} response completed.")
-
-        self._speak_ai_response(response)
 
     def _speak_ai_response(self, response: str) -> None:
         """Speak AI chat responses automatically when TTS is available."""
@@ -388,3 +477,12 @@ class ChatWindow(ctk.CTkToplevel):
         if elapsed_seconds is None:
             return message
         return f"{message} in {elapsed_seconds:.1f}s."
+
+    def _is_recognition_error(self, text: str) -> bool:
+        """Return True when speech-to-text returned a friendly error string."""
+        return text in {
+            "No speech detected.",
+            "Could not understand the audio.",
+            "Speech recognition service is unavailable.",
+            "Speech recognition packages are not installed.",
+        } or text.startswith("Microphone error:")
