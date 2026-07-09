@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import threading
-import time
 
 import customtkinter as ctk
 
@@ -39,11 +38,11 @@ class MainWindow(ctk.CTk):
     }
 
     def __init__(self) -> None:
-        ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         super().__init__()
         self.settings_manager = SettingsManager()
+        ctk.set_appearance_mode(self.settings_manager.load_settings().get("theme", "Dark"))
         self.language_manager = LanguageManager(self.settings_manager)
         self.speech_manager = SpeechManager(self.settings_manager)
         self.automation_manager = AutomationManager()
@@ -59,10 +58,9 @@ class MainWindow(ctk.CTk):
         self.status_value_label: ctk.CTkLabel | None = None
         self.status_detail_label: ctk.CTkLabel | None = None
         self.voice_animation: VoiceAnimation | None = None
+        self.command_entry: ctk.CTkEntry | None = None
         self._is_closing = False
         self._is_listening_once = False
-        self._auto_listening_enabled = True
-        self._auto_listening_thread: threading.Thread | None = None
 
         self._configure_window()
         self.create_header()
@@ -197,21 +195,62 @@ class MainWindow(ctk.CTk):
 
         self.status_detail_label = ctk.CTkLabel(
             center_frame,
-            text="Speak naturally. Ask a question or say a task.",
+            text="Press Talk or type a command. I will speak the result.",
             font=ctk.CTkFont(size=17),
             text_color="#CBD5E1",
             wraplength=760,
             justify="center",
         )
-        self.status_detail_label.grid(row=2, column=0)
+        self.status_detail_label.grid(row=2, column=0, pady=(0, 18))
+
+        action_frame = ctk.CTkFrame(center_frame, fg_color="transparent")
+        action_frame.grid(row=3, column=0, sticky="ew")
+        action_frame.grid_columnconfigure(0, weight=1)
+
+        self.command_entry = ctk.CTkEntry(
+            action_frame,
+            height=44,
+            placeholder_text="Ask a question or type a task...",
+            font=ctk.CTkFont(size=15),
+            fg_color="#0F172A",
+            border_color="#1E293B",
+            corner_radius=8,
+        )
+        self.command_entry.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        self.command_entry.bind("<Return>", self._handle_command_entry_return)
+
+        run_button = ctk.CTkButton(
+            action_frame,
+            text="Run",
+            command=self.run_typed_command,
+            width=92,
+            height=44,
+            corner_radius=8,
+            font=ctk.CTkFont(size=15, weight="bold"),
+        )
+        run_button.grid(row=0, column=1, padx=(0, 10))
+
+        talk_button = ctk.CTkButton(
+            action_frame,
+            text="Talk",
+            command=self.listen_once_from_dashboard,
+            width=96,
+            height=44,
+            corner_radius=8,
+            fg_color="#15803D",
+            hover_color="#166534",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        )
+        talk_button.grid(row=0, column=2)
 
     def create_toolbar(self) -> None:
         """Create the bottom command toolbar."""
         toolbar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#07111F")
         toolbar_frame.grid(row=3, column=0, sticky="ew")
-        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
 
         buttons: list[tuple[str, Callable[[], None]]] = [
+            (self.language_manager.translate("chat"), self.open_chat_window),
             (self.language_manager.translate("settings"), self.open_settings_window),
             (self.language_manager.translate("files"), self.open_file_manager_window),
             ("Hardware", self.open_hardware_window),
@@ -312,40 +351,37 @@ class MainWindow(ctk.CTk):
         thread = threading.Thread(target=self._listen_once_in_background, daemon=True)
         thread.start()
 
-    def _start_auto_listening(self) -> None:
-        """Start continuous direct listening without a wake word."""
-        if self._is_closing or not self._auto_listening_enabled:
-            return
-        if self._auto_listening_thread is not None and self._auto_listening_thread.is_alive():
+    def run_typed_command(self) -> None:
+        """Run text typed on the main assistant screen."""
+        if self.command_entry is None or self._is_closing:
             return
 
-        self._auto_listening_thread = threading.Thread(
-            target=self._auto_listen_loop,
+        command = self.command_entry.get().strip()
+        if not command:
+            self._set_status_detail("Type a question or task first.")
+            return
+
+        self.command_entry.delete(0, "end")
+        self._set_status_detail(f"Working on: {command}")
+        self.set_status("Processing")
+        thread = threading.Thread(
+            target=self._run_command_in_background,
+            args=(command, "typed"),
             daemon=True,
         )
-        self._auto_listening_thread.start()
+        thread.start()
 
-    def _auto_listen_loop(self) -> None:
-        """Continuously listen for one command at a time."""
-        while not self._is_closing and self._auto_listening_enabled:
-            self.set_status("Listening")
-            self._set_status_detail("Listening...")
-            command = self.speech_manager.listen_once()
+    def _handle_command_entry_return(self, event: object) -> str:
+        """Run the typed command when Enter is pressed."""
+        self.run_typed_command()
+        return "break"
 
-            if self._is_closing or not self._auto_listening_enabled:
-                return
-            if self._is_recognition_error(command):
-                self.set_status("Ready")
-                self._set_status_detail("Ready. Speak when you need me.")
-                time.sleep(0.8)
-                continue
-
-            self._set_status_detail(f"Heard: {command}")
-            self.set_status("Processing")
-            result = self.command_router.handle_user_input(command, source="voice")
-            self.after(0, lambda result=result: self._show_voice_result(result))
-            self._speak_feedback_blocking(result)
-            self.set_status("Ready")
+    def _run_command_in_background(self, command: str, source: str) -> None:
+        """Run a command without freezing the dashboard."""
+        result = self.command_router.handle_user_input(command, source=source)
+        self.after(0, lambda: self._show_voice_result(result))
+        self._speak_feedback_blocking(result)
+        self.set_status("Ready")
 
     def _listen_once_in_background(self) -> None:
         """Capture one voice command, execute it, and speak the result."""
@@ -393,10 +429,10 @@ class MainWindow(ctk.CTk):
         ).start()
 
     def _speak_greeting_then_listen(self, text: str) -> None:
-        """Speak the startup greeting, then begin automatic listening."""
+        """Speak the startup greeting and return to Ready."""
         self.speech_manager.speak(text)
         self.set_status("Ready")
-        self._start_auto_listening()
+        self._set_status_detail("Ready. Press Talk or type a command.")
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""
@@ -509,7 +545,6 @@ class MainWindow(ctk.CTk):
             return
 
         self._is_closing = True
-        self._auto_listening_enabled = False
         try:
             self.withdraw()
         except Exception:

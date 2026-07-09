@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 from config.settings_manager import SettingsManager
 from utils.logger import get_logger
 
@@ -13,6 +15,7 @@ class TextToSpeech:
         self.settings_manager = settings_manager
         self.engine = None
         self.logger = get_logger()
+        self._speech_lock = threading.RLock()
         self._initialize_engine()
 
     def speak(self, text: str) -> str:
@@ -20,24 +23,26 @@ class TextToSpeech:
         if self.engine is None:
             return "Text-to-speech engine is not available."
 
-        try:
-            self.set_voice()
-            self.engine.say(text)
-            self.engine.runAndWait()
-            return "Speech completed."
-        except Exception as error:
-            self.logger.error("Speaker error: %s", error)
-            return f"Speaker error: {error}"
+        with self._speech_lock:
+            try:
+                self.set_voice()
+                self.engine.say(text)
+                self.engine.runAndWait()
+                return "Speech completed."
+            except Exception as error:
+                self.logger.error("Speaker error: %s", error)
+                return f"Speaker error: {error}"
 
     def stop(self) -> None:
         """Stop current speech output."""
         if self.engine is None:
             return
 
-        try:
-            self.engine.stop()
-        except Exception:
-            return
+        with self._speech_lock:
+            try:
+                self.engine.stop()
+            except Exception:
+                return
 
     def set_voice(self) -> None:
         """Select the saved voice preference when available."""
