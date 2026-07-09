@@ -336,7 +336,7 @@ class ChatWindow(ctk.CTkToplevel):
         result: CommandResult,
         elapsed_seconds: float | None = None,
     ) -> None:
-        """Display router plan/result and update confirmation controls."""
+        """Display router plan/result, then speak the answer through speakers."""
         is_ai_response = result.action_details.strip() == "1. Ask AI"
         if result.action_details and not is_ai_response:
             plan_label = "AI Request" if is_ai_response else "Assistant Action"
@@ -361,15 +361,21 @@ class ChatWindow(ctk.CTkToplevel):
             self._hide_confirmation_controls()
 
         self._is_processing = False
+        self._speak_response(result.message)
 
     def _handle_ai_response(self, response: str) -> None:
-        """Display and optionally speak the AI response."""
+        """Display and speak the AI response."""
         self._append_display("Assistant", response)
         self.last_assistant_message = response
         self._set_status(f"{self.ai_manager.last_provider_used} response completed.")
+        self._speak_response(response)
 
     def _speak_ai_response(self, response: str) -> None:
         """Speak AI chat responses automatically when TTS is available."""
+        self._speak_response(response)
+
+    def _speak_response(self, response: str) -> None:
+        """Speak assistant output by default without blocking the chat UI."""
         if self.speech_manager is None:
             return
 
@@ -377,18 +383,21 @@ class ChatWindow(ctk.CTkToplevel):
         if not speech_text:
             return
 
+        self._set_status("Speaking...")
         threading.Thread(
             target=self._speak_and_return_ready,
-            args=(speech_text[:700],),
+            args=(speech_text[:900],),
             daemon=True,
         ).start()
 
     def _speak_and_return_ready(self, text: str) -> None:
         """Speak an AI response and reset the visual state."""
-        self.after(0, lambda: self._set_status("Speaking..."))
         if self.speech_manager is not None:
             self.speech_manager.speak(text)
-        self.after(0, lambda: self._set_status(self._status_text()))
+        try:
+            self.after(0, lambda: self._set_status(self._status_text()))
+        except Exception:
+            return
 
     def _show_confirmation_controls(self) -> None:
         """Show Confirm and Cancel buttons."""

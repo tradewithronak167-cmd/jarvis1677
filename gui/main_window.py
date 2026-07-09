@@ -367,6 +367,7 @@ class MainWindow(ctk.CTk):
         """Run a command without freezing the dashboard."""
         result = self.command_router.handle_user_input(command, source=source)
         self.after(0, lambda: self._show_voice_result(result))
+        self._speak_feedback_blocking(result)
         self.set_status("Ready")
 
     def _listen_once_in_background(self) -> None:
