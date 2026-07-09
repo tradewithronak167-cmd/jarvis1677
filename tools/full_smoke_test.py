@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from assistant.command_router import CommandRouter
 from config.settings_manager import SettingsManager
+from gui.main_window import MainWindow
 from language.language_manager import LanguageManager
 from speech.speech_manager import SpeechManager
 
@@ -48,6 +49,7 @@ def main() -> int:
 
     speech_manager = SpeechManager(settings_manager)
     checks.append(("voice packages", speech_manager.voice_is_ready(), "voice stack check"))
+    checks.append(("jarvis dashboard", _dashboard_widgets_exist(), "command center widgets"))
 
     failed = False
     print("HI ROLEX Full Smoke Test")
@@ -58,6 +60,18 @@ def main() -> int:
         failed = failed or not passed
 
     return 1 if failed else 0
+
+
+def _dashboard_widgets_exist() -> bool:
+    """Return True when the command center dashboard can be constructed."""
+    try:
+        app = MainWindow()
+        app.update()
+        ready = bool(app.voice_animation and app.activity_textbox and app.metric_labels)
+        app.close_application()
+        return ready
+    except Exception:
+        return False
 
 
 def _language_files_have_same_keys(language_manager: LanguageManager) -> bool:

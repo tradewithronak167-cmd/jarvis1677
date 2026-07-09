@@ -59,6 +59,8 @@ class MainWindow(ctk.CTk):
         self.status_detail_label: ctk.CTkLabel | None = None
         self.voice_animation: VoiceAnimation | None = None
         self.command_entry: ctk.CTkEntry | None = None
+        self.activity_textbox: ctk.CTkTextbox | None = None
+        self.metric_labels: dict[str, ctk.CTkLabel] = {}
         self._is_closing = False
         self._is_listening_once = False
 
@@ -67,6 +69,7 @@ class MainWindow(ctk.CTk):
         self.create_status_bar()
         self.create_chat_area()
         self.create_toolbar()
+        self._refresh_dashboard_metrics()
         self.after(2200, self._greet_user)
 
     def _configure_window(self) -> None:
@@ -168,33 +171,43 @@ class MainWindow(ctk.CTk):
         mode_label.grid(row=0, column=2, padx=(0, 24), pady=12, sticky="e")
 
     def create_chat_area(self) -> None:
-        """Create the dashboard activity area and voice animation panel."""
+        """Create the Jarvis-style command center dashboard."""
         assistant_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#080F1D")
         assistant_frame.grid(row=2, column=0, sticky="nsew")
-        assistant_frame.grid_columnconfigure(0, weight=1)
+        assistant_frame.grid_columnconfigure(0, weight=0)
+        assistant_frame.grid_columnconfigure(1, weight=1)
+        assistant_frame.grid_columnconfigure(2, weight=0)
         assistant_frame.grid_rowconfigure(0, weight=1)
+
+        self._create_system_panel(assistant_frame)
 
         center_frame = ctk.CTkFrame(
             assistant_frame,
             fg_color="transparent",
         )
-        center_frame.grid(row=0, column=0, padx=28, pady=24)
+        center_frame.grid(row=0, column=1, padx=20, pady=22, sticky="nsew")
         center_frame.grid_columnconfigure(0, weight=1)
+        center_frame.grid_rowconfigure(0, weight=1)
 
-        self.voice_animation = VoiceAnimation(center_frame)
-        self.voice_animation.grid(row=0, column=0, pady=(0, 22))
+        core_frame = ctk.CTkFrame(center_frame, fg_color="transparent")
+        core_frame.grid(row=0, column=0, sticky="nsew")
+        core_frame.grid_columnconfigure(0, weight=1)
+        core_frame.grid_rowconfigure(0, weight=1)
+
+        self.voice_animation = VoiceAnimation(core_frame)
+        self.voice_animation.grid(row=0, column=0, pady=(0, 18))
         self.voice_animation.set_status("Ready")
 
         heading_label = ctk.CTkLabel(
-            center_frame,
-            text="Voice Assistant Ready",
-            font=ctk.CTkFont(size=30, weight="bold"),
-            text_color="#F8FAFC",
+            core_frame,
+            text="HI ROLEX COMMAND CORE",
+            font=ctk.CTkFont(size=28, weight="bold"),
+            text_color="#22C55E",
         )
         heading_label.grid(row=1, column=0, pady=(0, 8))
 
         self.status_detail_label = ctk.CTkLabel(
-            center_frame,
+            core_frame,
             text="I will greet you, then listen for your command.",
             font=ctk.CTkFont(size=17),
             text_color="#CBD5E1",
@@ -203,7 +216,7 @@ class MainWindow(ctk.CTk):
         )
         self.status_detail_label.grid(row=2, column=0, pady=(0, 18))
 
-        action_frame = ctk.CTkFrame(center_frame, fg_color="transparent")
+        action_frame = ctk.CTkFrame(core_frame, fg_color="#0B1220", corner_radius=8)
         action_frame.grid(row=3, column=0, sticky="ew")
         action_frame.grid_columnconfigure(0, weight=1)
 
@@ -229,6 +242,112 @@ class MainWindow(ctk.CTk):
             font=ctk.CTkFont(size=15, weight="bold"),
         )
         run_button.grid(row=0, column=1, padx=(0, 10))
+
+        self._create_activity_panel(assistant_frame)
+
+    def _create_system_panel(self, parent: ctk.CTkFrame) -> None:
+        """Create the left live system monitor panel."""
+        panel = ctk.CTkFrame(
+            parent,
+            width=270,
+            fg_color="#050B12",
+            border_width=1,
+            border_color="#123524",
+            corner_radius=8,
+        )
+        panel.grid(row=0, column=0, padx=(22, 8), pady=22, sticky="ns")
+        panel.grid_propagate(False)
+        panel.grid_columnconfigure(0, weight=1)
+
+        title = ctk.CTkLabel(
+            panel,
+            text="SYSTEM MONITOR",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#22C55E",
+        )
+        title.grid(row=0, column=0, padx=18, pady=(20, 12), sticky="w")
+
+        subtitle = ctk.CTkLabel(
+            panel,
+            text="Safe Windows access",
+            font=ctk.CTkFont(size=12),
+            text_color="#94A3B8",
+        )
+        subtitle.grid(row=1, column=0, padx=18, pady=(0, 14), sticky="w")
+
+        metric_names = ("CPU", "RAM", "DISK", "BATTERY", "NETWORK", "VOLUME")
+        for index, name in enumerate(metric_names, start=2):
+            card = ctk.CTkFrame(panel, fg_color="#08111D", corner_radius=8)
+            card.grid(row=index, column=0, padx=14, pady=7, sticky="ew")
+            card.grid_columnconfigure(1, weight=1)
+
+            label = ctk.CTkLabel(
+                card,
+                text=name,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#86EFAC",
+            )
+            label.grid(row=0, column=0, padx=(12, 8), pady=10, sticky="w")
+
+            value = ctk.CTkLabel(
+                card,
+                text="Loading",
+                font=ctk.CTkFont(size=12),
+                text_color="#E5E7EB",
+                anchor="e",
+            )
+            value.grid(row=0, column=1, padx=(4, 12), pady=10, sticky="e")
+            self.metric_labels[name] = value
+
+        hint = ctk.CTkLabel(
+            panel,
+            text="Try: open Chrome, set volume to 50, what is Python",
+            font=ctk.CTkFont(size=12),
+            text_color="#64748B",
+            wraplength=220,
+            justify="left",
+        )
+        hint.grid(row=9, column=0, padx=18, pady=(18, 12), sticky="ew")
+
+    def _create_activity_panel(self, parent: ctk.CTkFrame) -> None:
+        """Create the right conversation and activity panel."""
+        panel = ctk.CTkFrame(
+            parent,
+            width=330,
+            fg_color="#050B12",
+            border_width=1,
+            border_color="#123524",
+            corner_radius=8,
+        )
+        panel.grid(row=0, column=2, padx=(8, 22), pady=22, sticky="ns")
+        panel.grid_propagate(False)
+        panel.grid_columnconfigure(0, weight=1)
+        panel.grid_rowconfigure(1, weight=1)
+
+        title = ctk.CTkLabel(
+            panel,
+            text="CONVERSATION",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#22C55E",
+        )
+        title.grid(row=0, column=0, padx=18, pady=(20, 12), sticky="w")
+
+        self.activity_textbox = ctk.CTkTextbox(
+            panel,
+            wrap="word",
+            fg_color="#07111F",
+            text_color="#D1FAE5",
+            border_width=1,
+            border_color="#123524",
+            corner_radius=8,
+            font=ctk.CTkFont(size=13),
+        )
+        self.activity_textbox.grid(row=1, column=0, padx=14, pady=(0, 14), sticky="nsew")
+        self.activity_textbox.insert(
+            "end",
+            "HI ROLEX is online.\nVoice control is ready after greeting.\n",
+        )
+        self.activity_textbox.configure(state="disabled")
 
     def create_toolbar(self) -> None:
         """Create the bottom command toolbar."""
@@ -465,6 +584,7 @@ class MainWindow(ctk.CTk):
     def _append_chat_message(self, sender: str, message: str) -> None:
         """Show the latest voice assistant event without a chat transcript."""
         self._set_status_detail(f"{sender}: {message}")
+        self._append_activity_message(sender, message)
 
     def _set_status_detail(self, message: str) -> None:
         """Update the large assistant detail line from any thread."""
@@ -476,6 +596,46 @@ class MainWindow(ctk.CTk):
         """Apply assistant detail text on the GUI thread."""
         if self.status_detail_label is not None:
             self.status_detail_label.configure(text=message[:220])
+
+    def _append_activity_message(self, sender: str, message: str) -> None:
+        """Append a compact activity line to the right command feed."""
+        if self._is_closing:
+            return
+        self.after(0, lambda: self._apply_activity_message(sender, message))
+
+    def _apply_activity_message(self, sender: str, message: str) -> None:
+        """Update the activity feed on the GUI thread."""
+        if self.activity_textbox is None:
+            return
+
+        self.activity_textbox.configure(state="normal")
+        self.activity_textbox.insert("end", f"\n{sender}\n{message[:700]}\n")
+        self.activity_textbox.see("end")
+        self.activity_textbox.configure(state="disabled")
+
+    def _refresh_dashboard_metrics(self) -> None:
+        """Refresh safe hardware metrics shown on the dashboard."""
+        if self._is_closing:
+            return
+
+        try:
+            metrics = {
+                "CPU": self.hardware_manager.get_cpu_usage(),
+                "RAM": self.hardware_manager.get_ram_usage(),
+                "DISK": self.hardware_manager.get_disk_usage(),
+                "BATTERY": self.hardware_manager.get_battery(),
+                "NETWORK": self.hardware_manager.get_network_status(),
+                "VOLUME": self._format_optional_percent(self.hardware_manager.get_volume()),
+            }
+        except Exception:
+            metrics = {}
+
+        for key, value in metrics.items():
+            label = self.metric_labels.get(key)
+            if label is not None:
+                label.configure(text=str(value)[:34])
+
+        self.after(3000, self._refresh_dashboard_metrics)
 
     def _append_automation_result(self, result: AutomationResult) -> None:
         """Append automation command details to the activity log."""
@@ -495,6 +655,13 @@ class MainWindow(ctk.CTk):
         """Show a compact latest result for the voice-only dashboard."""
         prefix = "Done" if result.success else "Needs attention"
         self._set_status_detail(f"{prefix}: {result.message}")
+        self._append_activity_message("HI ROLEX", f"{prefix}: {result.message}")
+
+    def _format_optional_percent(self, value: int | None) -> str:
+        """Format optional integer percentages for the dashboard."""
+        if value is None:
+            return "Unavailable"
+        return f"{value}%"
 
     def _speak_short_feedback(self, result: RouterCommandResult) -> None:
         """Speak a short result for voice commands when TTS is available."""
