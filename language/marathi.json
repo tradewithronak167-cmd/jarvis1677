@@ -1,0 +1,20 @@
+{
+    "app_title": "HI ROLEX",
+    "status": "स्थिती",
+    "status_ready": "तयार",
+    "settings": "सेटिंग्ज",
+    "chat": "चॅट",
+    "microphone": "मायक्रोफोन",
+    "files": "फाइल्स",
+    "exit": "बाहेर पडा",
+    "language": "भाषा",
+    "theme": "थीम",
+    "ai_mode": "AI मोड",
+    "offline_model": "ऑफलाइन मॉडेल",
+    "wake_word": "वेक वर्ड",
+    "voice": "आवाज",
+    "speaker": "स्पीकर",
+    "save": "सेव्ह करा",
+    "cancel": "रद्द करा",
+    "settings_saved": "सेटिंग्ज यशस्वीरित्या सेव्ह झाल्या."
+}

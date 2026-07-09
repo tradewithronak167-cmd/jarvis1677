@@ -10,6 +10,7 @@ from config.settings_manager import SettingsManager
 from language.language_manager import LanguageManager
 from speech.microphone_manager import MicrophoneManager
 from speech.speaker_manager import SpeakerManager
+from speech.text_to_speech import TextToSpeech
 
 
 class SettingsWindow(ctk.CTkToplevel):
@@ -20,7 +21,6 @@ class SettingsWindow(ctk.CTkToplevel):
 
     THEME_OPTIONS: list[str] = ["Dark", "Light"]
     AI_MODE_OPTIONS: list[str] = ["Offline", "Online", "Hybrid"]
-    VOICE_OPTIONS: list[str] = ["Male", "Female"]
 
     def __init__(
         self,
@@ -35,6 +35,7 @@ class SettingsWindow(ctk.CTkToplevel):
         self.language_options = self.language_manager.available_languages()
         self.microphone_options = MicrophoneManager().list_microphones()
         self.speaker_options = SpeakerManager().list_speakers()
+        self.voice_options = self._build_voice_options()
 
         self.language_var = ctk.StringVar(value=self.settings["language"])
         self.theme_var = ctk.StringVar(value=self.settings["theme"])
@@ -51,7 +52,7 @@ class SettingsWindow(ctk.CTkToplevel):
 
     def _configure_window(self) -> None:
         """Apply size, title, theme, and modal behavior."""
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode(self.settings.get("theme", "Dark"))
         self.title(
             f"{self.language_manager.translate('app_title')} "
             f"{self.language_manager.translate('settings')}"
@@ -126,7 +127,7 @@ class SettingsWindow(ctk.CTkToplevel):
             5,
             self.language_manager.translate("voice"),
             self.voice_var,
-            self.VOICE_OPTIONS,
+            self.voice_options,
         )
         self._create_dropdown_row(
             form_frame,
@@ -258,6 +259,10 @@ class SettingsWindow(ctk.CTkToplevel):
         settings = self.collect_settings()
         self.settings_manager.save_settings(settings)
         self.language_manager.change_language(settings["language"])
+        ctk.set_appearance_mode(settings["theme"])
+        apply_runtime_settings = getattr(self.master, "apply_runtime_settings", None)
+        if callable(apply_runtime_settings):
+            apply_runtime_settings(settings)
         messagebox.showinfo(
             self.language_manager.translate("settings"),
             self.language_manager.translate("settings_saved"),
@@ -267,3 +272,20 @@ class SettingsWindow(ctk.CTkToplevel):
     def cancel(self) -> None:
         """Close the settings window without saving changes."""
         self.destroy()
+
+    def _build_voice_options(self) -> list[str]:
+        """Return friendly voice choices plus installed Windows voices."""
+        base_options = ["Default", "Male", "Female"]
+        installed_voices = TextToSpeech(self.settings_manager).list_voices()
+        clean_voices = [
+            voice
+            for voice in installed_voices
+            if voice and "not available" not in voice.casefold()
+        ]
+        options = [*base_options]
+        for voice in clean_voices:
+            if voice not in options:
+                options.append(voice)
+        if self.settings.get("voice", "Female") not in options:
+            options.append(self.settings.get("voice", "Female"))
+        return options

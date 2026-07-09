@@ -18,3 +18,14 @@ def test_missing_translation_falls_back_safely(tmp_path) -> None:
     language_manager = LanguageManager(settings_manager)
 
     assert language_manager.translate("missing_key_for_test") == "missing_key_for_test"
+
+
+def test_new_voice_languages_are_available(tmp_path) -> None:
+    """Marathi and Marwari are available as selectable assistant languages."""
+    settings_manager = SettingsManager(tmp_path / "settings.json")
+    language_manager = LanguageManager(settings_manager)
+
+    languages = language_manager.available_languages()
+
+    assert "Marathi" in languages
+    assert "Marwari" in languages

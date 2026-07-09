@@ -10,6 +10,8 @@ LANGUAGE_CODES: dict[str, str] = {
     "Telugu": "te-IN",
     "Malayalam": "ml-IN",
     "Kannada": "kn-IN",
+    "Marathi": "mr-IN",
+    "Marwari": "hi-IN",
 }
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from config.settings_manager import SettingsManager
 from memory.conversation_memory import ConversationMemory
 from memory.memory_manager import MemoryManager
 from memory.profile_manager import ProfileManager
@@ -21,10 +22,12 @@ class PromptBuilder:
         memory_manager: MemoryManager | None = None,
         profile_manager: ProfileManager | None = None,
         conversation_memory: ConversationMemory | None = None,
+        settings_manager: SettingsManager | None = None,
     ) -> None:
         self.memory_manager = memory_manager or MemoryManager()
         self.profile_manager = profile_manager or ProfileManager()
         self.conversation_memory = conversation_memory or ConversationMemory()
+        self.settings_manager = settings_manager or SettingsManager()
 
     def build_prompt(self, user_message: str, history: list[dict[str, str]]) -> str:
         """Create a full prompt from the system prompt, history, and user message."""
@@ -32,11 +35,22 @@ class PromptBuilder:
         memory_text = self._format_memory_context()
         return (
             f"{self.SYSTEM_PROMPT}\n\n"
+            f"Reply language instruction:\n{self._language_instruction()}\n\n"
             f"Safe local memory context:\n{memory_text}\n\n"
             f"Conversation history:\n{history_text}\n\n"
             f"User: {user_message}\n"
             "HI ROLEX:"
         )
+
+    def _language_instruction(self) -> str:
+        """Return a short instruction for the selected response language."""
+        language = self.settings_manager.load_settings().get("language", "English")
+        if language == "Marwari":
+            return (
+                "Reply in simple Marwari/Rajasthani style when possible. "
+                "If exact Marwari is uncertain, use easy Hindi with Marwari-flavored words."
+            )
+        return f"Reply in {language} unless the user clearly asks for another language."
 
     def _format_history(self, history: list[dict[str, str]]) -> str:
         """Format recent conversation messages for the model."""

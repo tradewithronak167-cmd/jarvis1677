@@ -40,14 +40,6 @@ class HealthCheck:
         "config/settings.json",
         "gui/main_window.py",
     )
-    LANGUAGE_FILES: tuple[str, ...] = (
-        "english.json",
-        "tamil.json",
-        "hindi.json",
-        "telugu.json",
-        "malayalam.json",
-        "kannada.json",
-    )
     REQUIRED_PACKAGES: tuple[str, ...] = (
         "customtkinter",
         "requests",
@@ -107,13 +99,12 @@ class HealthCheck:
 
     def check_language_files(self) -> None:
         """Check language JSON files exist and load."""
-        for filename in self.LANGUAGE_FILES:
-            path = PROJECT_ROOT / "language" / filename
+        for path in sorted((PROJECT_ROOT / "language").glob("*.json")):
             try:
                 json.loads(path.read_text(encoding="utf-8"))
-                self.add_result("OK", f"Language {filename}", "valid")
+                self.add_result("OK", f"Language {path.name}", "valid")
             except Exception as error:
-                self.add_result("WARN", f"Language {filename}", str(error))
+                self.add_result("WARN", f"Language {path.name}", str(error))
 
     def check_memory_database(self) -> None:
         """Check memory database can be opened."""

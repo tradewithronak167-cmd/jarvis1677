@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import threading
+import time
 
 import customtkinter as ctk
 
@@ -56,10 +57,12 @@ class MainWindow(ctk.CTk):
         self.settings_window: SettingsWindow | None = None
         self.voice_test_window: VoiceTestWindow | None = None
         self.status_value_label: ctk.CTkLabel | None = None
+        self.status_detail_label: ctk.CTkLabel | None = None
         self.voice_animation: VoiceAnimation | None = None
-        self.chat_textbox: ctk.CTkTextbox | None = None
         self._is_closing = False
         self._is_listening_once = False
+        self._auto_listening_enabled = True
+        self._auto_listening_thread: threading.Thread | None = None
 
         self._configure_window()
         self.create_header()
@@ -168,46 +171,47 @@ class MainWindow(ctk.CTk):
 
     def create_chat_area(self) -> None:
         """Create the dashboard activity area and voice animation panel."""
-        chat_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#080F1D")
-        chat_frame.grid(row=2, column=0, sticky="nsew")
-        chat_frame.grid_columnconfigure(0, weight=0)
-        chat_frame.grid_columnconfigure(1, weight=1)
-        chat_frame.grid_rowconfigure(0, weight=1)
+        assistant_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#080F1D")
+        assistant_frame.grid(row=2, column=0, sticky="nsew")
+        assistant_frame.grid_columnconfigure(0, weight=1)
+        assistant_frame.grid_rowconfigure(0, weight=1)
 
-        self.voice_animation = VoiceAnimation(chat_frame)
-        self.voice_animation.grid(row=0, column=0, padx=(24, 10), pady=24, sticky="ns")
+        center_frame = ctk.CTkFrame(
+            assistant_frame,
+            fg_color="transparent",
+        )
+        center_frame.grid(row=0, column=0, padx=28, pady=24)
+        center_frame.grid_columnconfigure(0, weight=1)
 
-        self.chat_textbox = ctk.CTkTextbox(
-            chat_frame,
-            font=ctk.CTkFont(size=16),
-            text_color="#E5E7EB",
-            fg_color="#0F172A",
-            border_width=1,
-            border_color="#1E293B",
-            corner_radius=8,
-            wrap="word",
+        self.voice_animation = VoiceAnimation(center_frame)
+        self.voice_animation.grid(row=0, column=0, pady=(0, 22))
+        self.voice_animation.set_status("Ready")
+
+        heading_label = ctk.CTkLabel(
+            center_frame,
+            text="Voice Assistant Ready",
+            font=ctk.CTkFont(size=30, weight="bold"),
+            text_color="#F8FAFC",
         )
-        self.chat_textbox.grid(row=0, column=1, padx=(10, 24), pady=24, sticky="nsew")
-        self.chat_textbox.insert(
-            "1.0",
-            (
-                "HI ROLEX is ready.\n\n"
-                "Press Listen Now and speak naturally.\n\n"
-                "You can ask questions or give commands like open notepad, close chrome, "
-                "or set volume to 50."
-            ),
+        heading_label.grid(row=1, column=0, pady=(0, 8))
+
+        self.status_detail_label = ctk.CTkLabel(
+            center_frame,
+            text="Speak naturally. Ask a question or say a task.",
+            font=ctk.CTkFont(size=17),
+            text_color="#CBD5E1",
+            wraplength=760,
+            justify="center",
         )
-        self.chat_textbox.configure(state="disabled")
+        self.status_detail_label.grid(row=2, column=0)
 
     def create_toolbar(self) -> None:
         """Create the bottom command toolbar."""
         toolbar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#07111F")
         toolbar_frame.grid(row=3, column=0, sticky="ew")
-        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
+        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         buttons: list[tuple[str, Callable[[], None]]] = [
-            ("Listen Now", self.listen_once_from_dashboard),
-            (self.language_manager.translate("chat"), self.open_chat_window),
             (self.language_manager.translate("settings"), self.open_settings_window),
             (self.language_manager.translate("files"), self.open_file_manager_window),
             ("Hardware", self.open_hardware_window),
@@ -245,6 +249,16 @@ class MainWindow(ctk.CTk):
             self,
             self.settings_manager,
             self.language_manager,
+        )
+
+    def apply_runtime_settings(self, settings: dict[str, str]) -> None:
+        """Apply settings that can safely change while the app is running."""
+        ctk.set_appearance_mode(settings.get("theme", "Dark"))
+        self.language_manager.change_language(settings.get("language", "English"))
+        self.title(self.language_manager.translate("app_title"))
+        self._set_status_detail(
+            f"Settings updated. Language: {settings.get('language', 'English')}. "
+            f"Theme: {settings.get('theme', 'Dark')}."
         )
 
     def open_voice_test_window(self) -> None:
@@ -298,6 +312,41 @@ class MainWindow(ctk.CTk):
         thread = threading.Thread(target=self._listen_once_in_background, daemon=True)
         thread.start()
 
+    def _start_auto_listening(self) -> None:
+        """Start continuous direct listening without a wake word."""
+        if self._is_closing or not self._auto_listening_enabled:
+            return
+        if self._auto_listening_thread is not None and self._auto_listening_thread.is_alive():
+            return
+
+        self._auto_listening_thread = threading.Thread(
+            target=self._auto_listen_loop,
+            daemon=True,
+        )
+        self._auto_listening_thread.start()
+
+    def _auto_listen_loop(self) -> None:
+        """Continuously listen for one command at a time."""
+        while not self._is_closing and self._auto_listening_enabled:
+            self.set_status("Listening")
+            self._set_status_detail("Listening...")
+            command = self.speech_manager.listen_once()
+
+            if self._is_closing or not self._auto_listening_enabled:
+                return
+            if self._is_recognition_error(command):
+                self.set_status("Ready")
+                self._set_status_detail("Ready. Speak when you need me.")
+                time.sleep(0.8)
+                continue
+
+            self._set_status_detail(f"Heard: {command}")
+            self.set_status("Processing")
+            result = self.command_router.handle_user_input(command, source="voice")
+            self.after(0, lambda result=result: self._show_voice_result(result))
+            self._speak_feedback_blocking(result)
+            self.set_status("Ready")
+
     def _listen_once_in_background(self) -> None:
         """Capture one voice command, execute it, and speak the result."""
         command = self.speech_manager.listen_once()
@@ -312,14 +361,14 @@ class MainWindow(ctk.CTk):
 
     def _handle_voice_result(self, result: RouterCommandResult) -> None:
         """Display a compact voice result and finish the listening cycle."""
-        self._append_router_result(result)
+        self._show_voice_result(result)
         self._is_listening_once = False
         self._speak_short_feedback(result)
 
     def _handle_listen_error(self, message: str) -> None:
         """Recover cleanly when voice capture fails."""
         self._is_listening_once = False
-        self._append_chat_message("Voice", message)
+        self._set_status_detail(message)
         self.set_status("Speaking")
         threading.Thread(
             target=self._speak_and_set_ready,
@@ -335,13 +384,19 @@ class MainWindow(ctk.CTk):
         """Greet Ronak by voice after the app has opened."""
         if self._is_closing:
             return
-        self._append_chat_message("HI ROLEX", self.GREETING_TEXT)
+        self._set_status_detail(self.GREETING_TEXT)
         self.set_status("Speaking")
         threading.Thread(
-            target=self._speak_and_set_ready,
+            target=self._speak_greeting_then_listen,
             args=(self.GREETING_TEXT,),
             daemon=True,
         ).start()
+
+    def _speak_greeting_then_listen(self, text: str) -> None:
+        """Speak the startup greeting, then begin automatic listening."""
+        self.speech_manager.speak(text)
+        self.set_status("Ready")
+        self._start_auto_listening()
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""
@@ -381,17 +436,22 @@ class MainWindow(ctk.CTk):
         """Display wake-listener errors without crashing the GUI."""
         if self._is_closing:
             return
-        self.after(0, lambda: self._append_chat_message("Voice System", message))
+        self.after(0, lambda: self._set_status_detail(message))
 
     def _append_chat_message(self, sender: str, message: str) -> None:
-        """Append a message to the dashboard activity log."""
-        if self.chat_textbox is None:
-            return
+        """Show the latest voice assistant event without a chat transcript."""
+        self._set_status_detail(f"{sender}: {message}")
 
-        self.chat_textbox.configure(state="normal")
-        self.chat_textbox.insert("end", f"\n\n{sender}: {message}")
-        self.chat_textbox.see("end")
-        self.chat_textbox.configure(state="disabled")
+    def _set_status_detail(self, message: str) -> None:
+        """Update the large assistant detail line from any thread."""
+        if self._is_closing:
+            return
+        self.after(0, lambda: self._apply_status_detail(message))
+
+    def _apply_status_detail(self, message: str) -> None:
+        """Apply assistant detail text on the GUI thread."""
+        if self.status_detail_label is not None:
+            self.status_detail_label.configure(text=message[:220])
 
     def _append_automation_result(self, result: AutomationResult) -> None:
         """Append automation command details to the activity log."""
@@ -405,28 +465,38 @@ class MainWindow(ctk.CTk):
 
     def _append_router_result(self, result: RouterCommandResult) -> None:
         """Append routed command result details to the activity log."""
-        status_text = "Success" if result.success else "Needs attention"
-        message = (
-            f"Plan:\n{result.action_details}\n\n"
-            f"Result: {status_text} - {result.message}"
-        )
-        self._append_chat_message("HI ROLEX", message)
+        self._show_voice_result(result)
+
+    def _show_voice_result(self, result: RouterCommandResult) -> None:
+        """Show a compact latest result for the voice-only dashboard."""
+        prefix = "Done" if result.success else "Needs attention"
+        self._set_status_detail(f"{prefix}: {result.message}")
 
     def _speak_short_feedback(self, result: RouterCommandResult) -> None:
         """Speak a short result for voice commands when TTS is available."""
-        if result.confirmation_required:
-            feedback = "Please confirm this action in the chat window."
-        elif result.success:
-            feedback = result.message.splitlines()[0][:120]
-        else:
-            feedback = "I could not complete that request."
-
         self.set_status("Speaking")
         threading.Thread(
-            target=self._speak_and_set_ready,
-            args=(feedback,),
+            target=self._speak_feedback_and_set_ready,
+            args=(result,),
             daemon=True,
         ).start()
+
+    def _speak_feedback_and_set_ready(self, result: RouterCommandResult) -> None:
+        """Speak result feedback, then return to Ready."""
+        self._speak_feedback_blocking(result)
+        self.set_status("Ready")
+
+    def _speak_feedback_blocking(self, result: RouterCommandResult) -> None:
+        """Speak a full useful response for voice-first interaction."""
+        if result.confirmation_required:
+            feedback = "Please confirm this action."
+        elif result.success:
+            feedback = result.message.strip()[:900]
+        else:
+            feedback = result.message.strip()[:450] or "I could not complete that request."
+
+        self.set_status("Speaking")
+        self.speech_manager.speak(feedback)
 
     def _speak_and_set_ready(self, text: str) -> None:
         """Speak text without freezing the GUI, then return to Ready."""
@@ -439,6 +509,7 @@ class MainWindow(ctk.CTk):
             return
 
         self._is_closing = True
+        self._auto_listening_enabled = False
         try:
             self.withdraw()
         except Exception:

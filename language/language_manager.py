@@ -20,6 +20,8 @@ class LanguageManager:
         "Telugu": "telugu.json",
         "Malayalam": "malayalam.json",
         "Kannada": "kannada.json",
+        "Marathi": "marathi.json",
+        "Marwari": "marwari.json",
     }
 
     def __init__(

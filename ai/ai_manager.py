@@ -31,6 +31,7 @@ class AIManager:
             self.memory_manager,
             self.profile_manager,
             self.conversation_memory,
+            self.settings_manager,
         )
         self.internet_checker = InternetChecker()
         self.online_ai = OnlineAI(self.prompt_builder, self.conversation_manager)

@@ -40,18 +40,27 @@ class TextToSpeech:
             return
 
     def set_voice(self) -> None:
-        """Select the saved Male or Female voice when available."""
+        """Select the saved voice preference when available."""
         if self.engine is None:
             return
 
         settings = self.settings_manager.load_settings()
-        preferred_voice = settings.get("voice", "Female").lower()
+        preferred_voice = settings.get("voice", "Female").strip()
+        if not preferred_voice or preferred_voice == "Default":
+            return
+
+        preferred_voice_lower = preferred_voice.lower()
 
         try:
             voices = self.engine.getProperty("voices")
             for voice in voices:
                 voice_text = f"{voice.name} {voice.id}".lower()
-                if preferred_voice in voice_text:
+                if preferred_voice_lower == str(voice.name).lower():
+                    self.engine.setProperty("voice", voice.id)
+                    return
+            for voice in voices:
+                voice_text = f"{voice.name} {voice.id}".lower()
+                if preferred_voice_lower in voice_text:
                     self.engine.setProperty("voice", voice.id)
                     return
         except Exception:
