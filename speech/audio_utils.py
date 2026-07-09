@@ -22,5 +22,15 @@ def get_language_code(language_name: str) -> str:
 
 def safe_device_list(devices: list[str]) -> list[str]:
     """Return a non-empty device list for GUI dropdowns."""
-    cleaned_devices = [device for device in devices if device.strip()]
+    cleaned_devices: list[str] = []
+    seen: set[str] = set()
+    for device in devices:
+        cleaned_device = device.strip()
+        if not cleaned_device:
+            continue
+        normalized_device = " ".join(cleaned_device.casefold().split())
+        if normalized_device in seen:
+            continue
+        seen.add(normalized_device)
+        cleaned_devices.append(cleaned_device)
     return cleaned_devices or ["Default"]

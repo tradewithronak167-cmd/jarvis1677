@@ -21,6 +21,8 @@ class VoiceTestWindow(ctk.CTkToplevel):
         super().__init__(master)
         self.speech_manager = speech_manager
         self.status_label: ctk.CTkLabel | None = None
+        self.mic_level_label: ctk.CTkLabel | None = None
+        self.mic_level_bar: ctk.CTkProgressBar | None = None
         self.result_textbox: ctk.CTkTextbox | None = None
         self.action_buttons: list[ctk.CTkButton] = []
 
@@ -53,7 +55,7 @@ class VoiceTestWindow(ctk.CTkToplevel):
         """Build the voice diagnostics controls and result area."""
         self.configure(fg_color="#080F1D")
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
         header = ctk.CTkFrame(self, corner_radius=0, fg_color="#07111F")
         header.grid(row=0, column=0, sticky="ew")
@@ -85,11 +87,12 @@ class VoiceTestWindow(ctk.CTkToplevel):
 
         button_frame = ctk.CTkFrame(self, fg_color="#0F172A", corner_radius=8)
         button_frame.grid(row=1, column=0, padx=24, pady=18, sticky="ew")
-        button_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
+        button_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
 
         buttons: list[tuple[str, Callable[[], None]]] = [
             ("Refresh", self.refresh_diagnostics),
             ("Microphones", self.show_microphones),
+            ("Mic Beat", self.test_microphone_beat),
             ("Speakers", self.show_speakers),
             ("TTS Voices", self.show_tts_voices),
             ("Speak Hello", self.speak_hello),
@@ -108,6 +111,26 @@ class VoiceTestWindow(ctk.CTkToplevel):
             button.grid(row=0, column=column, padx=6, pady=12, sticky="ew")
             self.action_buttons.append(button)
 
+        beat_frame = ctk.CTkFrame(self, fg_color="#07111F", corner_radius=8)
+        beat_frame.grid(row=2, column=0, padx=24, pady=(0, 18), sticky="ew")
+        beat_frame.grid_columnconfigure(1, weight=1)
+
+        self.mic_level_label = ctk.CTkLabel(
+            beat_frame,
+            text="Mic beat: idle",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#86EFAC",
+        )
+        self.mic_level_label.grid(row=0, column=0, padx=16, pady=14, sticky="w")
+
+        self.mic_level_bar = ctk.CTkProgressBar(
+            beat_frame,
+            height=14,
+            progress_color="#22C55E",
+        )
+        self.mic_level_bar.grid(row=0, column=1, padx=(0, 16), pady=14, sticky="ew")
+        self.mic_level_bar.set(0)
+
         self.result_textbox = ctk.CTkTextbox(
             self,
             wrap="word",
@@ -117,10 +140,10 @@ class VoiceTestWindow(ctk.CTkToplevel):
             border_color="#1E293B",
             corner_radius=8,
         )
-        self.result_textbox.grid(row=2, column=0, padx=24, pady=(0, 18), sticky="nsew")
+        self.result_textbox.grid(row=3, column=0, padx=24, pady=(0, 18), sticky="nsew")
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.grid(row=3, column=0, padx=24, pady=(0, 22), sticky="ew")
+        footer.grid(row=4, column=0, padx=24, pady=(0, 22), sticky="ew")
         footer.grid_columnconfigure(0, weight=1)
 
         close_button = ctk.CTkButton(
@@ -149,7 +172,27 @@ class VoiceTestWindow(ctk.CTkToplevel):
         ready, message = self.speech_manager.speech_to_text.microphone_ready()
         microphones = self.speech_manager.microphone_manager.list_microphones()
         self._set_status(message, "#22C55E" if ready else "#F59E0B")
-        self._set_result("Microphone Check\n================\n\n" + "\n".join(microphones))
+        selected = self.speech_manager.settings_manager.load_settings().get(
+            "microphone",
+            "Default",
+        )
+        self._set_result(
+            "Microphone Check\n"
+            "================\n\n"
+            f"Selected microphone: {selected}\n"
+            f"Status: {message}\n\n"
+            "Detected microphones:\n"
+            + "\n".join(f"- {microphone}" for microphone in microphones)
+        )
+
+    def test_microphone_beat(self) -> None:
+        """Show a live microphone input level beat for a few seconds."""
+        self._set_status("Listening for mic beat...", "#22C55E")
+        self._set_result("Speak near the microphone. The beat bar should move.")
+        self._set_mic_level(0)
+        self._set_buttons_enabled(False)
+        thread = threading.Thread(target=self._run_microphone_beat_test, daemon=True)
+        thread.start()
 
     def show_speakers(self) -> None:
         """Show detected speakers and TTS readiness status."""
@@ -196,6 +239,28 @@ class VoiceTestWindow(ctk.CTkToplevel):
 
         self.after(0, lambda: self._finish_background_task(str(result)))
 
+    def _run_microphone_beat_test(self) -> None:
+        """Measure mic input and update the beat meter from a background thread."""
+        success, message, peak = self.speech_manager.speech_to_text.measure_microphone_level(
+            duration_seconds=4.0,
+            level_callback=lambda level: self.after(0, lambda: self._set_mic_level(level)),
+        )
+        color = "#22C55E" if success else "#F59E0B"
+        self.after(0, lambda: self._finish_microphone_beat_test(message, peak, color))
+
+    def _finish_microphone_beat_test(self, message: str, peak: int, color: str) -> None:
+        """Display the final microphone beat result."""
+        self._set_status(message, color)
+        self._set_mic_level(peak)
+        self._set_result(
+            "Microphone Beat Test\n"
+            "====================\n\n"
+            f"{message}\n\n"
+            "If the beat stays at 0%, choose the correct microphone in Settings "
+            "or check Windows microphone permission."
+        )
+        self._set_buttons_enabled(True)
+
     def _finish_background_task(self, result: str) -> None:
         """Display task result and re-enable controls."""
         self._set_result(result)
@@ -207,6 +272,14 @@ class VoiceTestWindow(ctk.CTkToplevel):
         state = "normal" if enabled else "disabled"
         for button in self.action_buttons:
             button.configure(state=state)
+
+    def _set_mic_level(self, level: int) -> None:
+        """Update the visible microphone beat meter."""
+        safe_level = max(0, min(100, level))
+        if self.mic_level_bar is not None:
+            self.mic_level_bar.set(safe_level / 100)
+        if self.mic_level_label is not None:
+            self.mic_level_label.configure(text=f"Mic beat: {safe_level}%")
 
     def _set_status(self, text: str, color: str) -> None:
         """Update the status label."""

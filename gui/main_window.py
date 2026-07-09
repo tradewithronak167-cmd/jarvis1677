@@ -353,10 +353,11 @@ class MainWindow(ctk.CTk):
         """Create the bottom command toolbar."""
         toolbar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#07111F")
         toolbar_frame.grid(row=3, column=0, sticky="ew")
-        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5), weight=1)
+        toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
 
         buttons: list[tuple[str, Callable[[], None]]] = [
             (self.language_manager.translate("chat"), self.open_chat_window),
+            ("Mic Check", self.open_voice_test_window),
             (self.language_manager.translate("settings"), self.open_settings_window),
             (self.language_manager.translate("files"), self.open_file_manager_window),
             ("Hardware", self.open_hardware_window),

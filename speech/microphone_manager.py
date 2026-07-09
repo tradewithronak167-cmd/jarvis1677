@@ -10,6 +10,10 @@ class MicrophoneManager:
 
     def list_microphones(self) -> list[str]:
         """Return available microphones, falling back to Default on errors."""
+        pyaudio_microphones = self._list_microphones_with_pyaudio()
+        if pyaudio_microphones != ["Default"]:
+            return pyaudio_microphones
+
         try:
             import speech_recognition as sr
 
@@ -21,6 +25,24 @@ class MicrophoneManager:
     def get_default_microphone(self) -> str:
         """Return the default microphone name."""
         return self.list_microphones()[0]
+
+    def _list_microphones_with_pyaudio(self) -> list[str]:
+        """Use PyAudio device metadata to list real input devices."""
+        try:
+            import pyaudio
+
+            audio = pyaudio.PyAudio()
+            microphones: list[str] = []
+            try:
+                for index in range(audio.get_device_count()):
+                    device = audio.get_device_info_by_index(index)
+                    if int(device.get("maxInputChannels", 0)) > 0:
+                        microphones.append(str(device.get("name", "")))
+            finally:
+                audio.terminate()
+            return safe_device_list(microphones)
+        except Exception:
+            return ["Default"]
 
     def _list_microphones_with_sounddevice(self) -> list[str]:
         """Try sounddevice as a fallback microphone detector."""
