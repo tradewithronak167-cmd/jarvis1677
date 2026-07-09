@@ -15,6 +15,7 @@ class VoiceAnimation(ctk.CTkFrame):
         "Sleeping": "#38BDF8",
         "Listening": "#22C55E",
         "Processing": "#F59E0B",
+        "Thinking": "#F59E0B",
         "Speaking": "#A78BFA",
         "Ready": "#22C55E",
     }
@@ -23,6 +24,7 @@ class VoiceAnimation(ctk.CTkFrame):
         "Sleeping": "Waiting for wake word",
         "Listening": "Microphone is listening",
         "Processing": "Working on the command",
+        "Thinking": "AI response is being prepared",
         "Speaking": "Voice response active",
         "Ready": "Ready for commands",
     }
@@ -102,6 +104,9 @@ class VoiceAnimation(ctk.CTkFrame):
         color = self.STATUS_COLORS.get(self.status, "#E5E7EB")
         idle_scale = 0.28 if self.status in {"Sleeping", "Ready"} else 1.0
         speed = 0.18 if self.status in {"Sleeping", "Ready"} else 0.38
+        if self.status == "Thinking":
+            idle_scale = 0.72
+            speed = 0.28
 
         center_y = 55
         bar_width = 10

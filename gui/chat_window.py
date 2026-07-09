@@ -12,14 +12,15 @@ from ai.conversation_manager import ConversationManager
 from assistant.command_models import CommandResult
 from assistant.command_router import CommandRouter
 from assistant.task_executor import TaskExecutor
+from gui.voice_animation import VoiceAnimation
 from speech.speech_manager import SpeechManager
 
 
 class ChatWindow(ctk.CTkToplevel):
     """CustomTkinter window for online AI chat."""
 
-    WINDOW_WIDTH: int = 820
-    WINDOW_HEIGHT: int = 620
+    WINDOW_WIDTH: int = 980
+    WINDOW_HEIGHT: int = 660
 
     def __init__(self, master: ctk.CTk, speech_manager: SpeechManager | None = None) -> None:
         super().__init__(master)
@@ -35,6 +36,7 @@ class ChatWindow(ctk.CTkToplevel):
         self.status_label: ctk.CTkLabel | None = None
         self.confirm_button: ctk.CTkButton | None = None
         self.cancel_button: ctk.CTkButton | None = None
+        self.voice_animation: VoiceAnimation | None = None
 
         self._configure_window()
         self.create_layout()
@@ -44,7 +46,7 @@ class ChatWindow(ctk.CTkToplevel):
         """Configure window title, size, and behavior."""
         self.title("HI ROLEX Chat")
         self.geometry(f"{self.WINDOW_WIDTH}x{self.WINDOW_HEIGHT}")
-        self.minsize(700, 520)
+        self.minsize(820, 560)
         self.resizable(True, True)
         self._center_window()
         self.transient(self.master)
@@ -86,8 +88,18 @@ class ChatWindow(ctk.CTkToplevel):
         )
         self.status_label.grid(row=1, column=0, padx=24, pady=(0, 14), sticky="w")
 
+        body = ctk.CTkFrame(self, fg_color="#080F1D", corner_radius=0)
+        body.grid(row=1, column=0, sticky="nsew")
+        body.grid_columnconfigure(0, weight=0)
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
+
+        self.voice_animation = VoiceAnimation(body)
+        self.voice_animation.grid(row=0, column=0, padx=(24, 10), pady=18, sticky="ns")
+        self.voice_animation.set_status("Ready")
+
         self.chat_display = ctk.CTkTextbox(
-            self,
+            body,
             wrap="word",
             font=ctk.CTkFont(size=15),
             fg_color="#080F1D",
@@ -96,7 +108,7 @@ class ChatWindow(ctk.CTkToplevel):
             border_color="#1E293B",
             corner_radius=8,
         )
-        self.chat_display.grid(row=1, column=0, padx=24, pady=18, sticky="nsew")
+        self.chat_display.grid(row=0, column=1, padx=(10, 24), pady=18, sticky="nsew")
         self.chat_display.configure(state="disabled")
 
         input_frame = ctk.CTkFrame(self, fg_color="#07111F", corner_radius=0)
@@ -154,11 +166,11 @@ class ChatWindow(ctk.CTkToplevel):
         """Load saved conversation history into the display."""
         history = self.conversation_manager.get_history()
         if not history:
-            self._append_display("System", "Chat ready. Basic AI mode works without setup.")
+            self._append_display("System", "Ready. Type a question or task and press Enter.")
             return
 
         for message in history:
-            role = "You" if message["role"] == "user" else "HI ROLEX"
+            role = "You" if message["role"] == "user" else "Assistant"
             self._append_display(role, message["content"])
 
     def send_message(self) -> None:
@@ -170,8 +182,11 @@ class ChatWindow(ctk.CTkToplevel):
 
         self._clear_input()
         self._append_display("You", user_message)
-        self._set_status("Thinking...")
-        self.after(100, lambda: self._set_status(self.ai_manager.get_thinking_status()))
+        if self._is_local_task(user_message):
+            self._set_status("Processing task...")
+        else:
+            self._set_status("Thinking...")
+            self.after(100, lambda: self._set_status(self.ai_manager.get_thinking_status()))
 
         self._hide_confirmation_controls()
         thread = threading.Thread(
@@ -235,11 +250,11 @@ class ChatWindow(ctk.CTkToplevel):
     ) -> None:
         """Display router plan/result and update confirmation controls."""
         is_ai_response = result.action_details.strip() == "1. Ask AI"
-        if result.action_details:
+        if result.action_details and not is_ai_response:
             plan_label = "AI Request" if is_ai_response else "Assistant Action"
             self._append_display(plan_label, result.action_details)
 
-        response_label = "AI Response" if is_ai_response else "Execution Result"
+        response_label = "Assistant" if is_ai_response else "Execution Result"
         self._append_display(response_label, result.message)
         if result.confirmation_required:
             self._set_status("Confirmation required.")
@@ -259,7 +274,7 @@ class ChatWindow(ctk.CTkToplevel):
 
     def _handle_ai_response(self, response: str) -> None:
         """Display and optionally speak the AI response."""
-        self._append_display("HI ROLEX", response)
+        self._append_display("Assistant", response)
         self._set_status(f"{self.ai_manager.last_provider_used} response completed.")
 
         self._speak_ai_response(response)
@@ -274,10 +289,17 @@ class ChatWindow(ctk.CTkToplevel):
             return
 
         threading.Thread(
-            target=self.speech_manager.speak,
+            target=self._speak_and_return_ready,
             args=(speech_text[:700],),
             daemon=True,
         ).start()
+
+    def _speak_and_return_ready(self, text: str) -> None:
+        """Speak an AI response and reset the visual state."""
+        self.after(0, lambda: self._set_status("Speaking..."))
+        if self.speech_manager is not None:
+            self.speech_manager.speak(text)
+        self.after(0, lambda: self._set_status(self._status_text()))
 
     def _show_confirmation_controls(self) -> None:
         """Show Confirm and Cancel buttons."""
@@ -319,6 +341,34 @@ class ChatWindow(ctk.CTkToplevel):
         """Update the chat status label."""
         if self.status_label is not None:
             self.status_label.configure(text=message)
+        self._set_voice_state_for_status(message)
+
+    def _set_voice_state_for_status(self, message: str) -> None:
+        """Map chat status text to the animation state."""
+        if self.voice_animation is None:
+            return
+
+        lowered = message.casefold()
+        if "thinking" in lowered or "online ai" in lowered or "offline ai" in lowered or "hybrid" in lowered:
+            self.voice_animation.set_status("Thinking")
+        elif "processing" in lowered or "executing" in lowered:
+            self.voice_animation.set_status("Processing")
+        elif "speaking" in lowered:
+            self.voice_animation.set_status("Speaking")
+        elif "confirmation" in lowered:
+            self.voice_animation.set_status("Listening")
+        else:
+            self.voice_animation.set_status("Ready")
+
+    def _is_local_task(self, message: str) -> bool:
+        """Return True when text will be handled by local command modules."""
+        try:
+            plan = self.command_router.create_plan(message)
+        except Exception:
+            return False
+        return bool(plan.actions) and all(
+            action.intent.category != "ai_chat" for action in plan.actions
+        )
 
     def _status_text(self) -> str:
         """Return current AI mode status."""

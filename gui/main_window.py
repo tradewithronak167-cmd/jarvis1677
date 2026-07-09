@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import threading
 
 import customtkinter as ctk
 
@@ -21,7 +22,6 @@ from gui.voice_test_window import VoiceTestWindow
 from language.language_manager import LanguageManager
 from speech.speech_manager import SpeechManager
 from utils.app_paths import APP_ICON_PATH
-from wakeword.wake_word_manager import WakeWordManager
 
 
 class MainWindow(ctk.CTk):
@@ -29,6 +29,13 @@ class MainWindow(ctk.CTk):
 
     WINDOW_WIDTH: int = 1200
     WINDOW_HEIGHT: int = 700
+    GREETING_TEXT: str = "Hi Ronak. I am ready."
+    LISTENING_ERRORS: set[str] = {
+        "No speech detected.",
+        "Could not understand the audio.",
+        "Speech recognition service is unavailable.",
+        "Speech recognition packages are not installed.",
+    }
 
     def __init__(self) -> None:
         ctk.set_appearance_mode("dark")
@@ -42,7 +49,6 @@ class MainWindow(ctk.CTk):
         self.command_router = CommandRouter(
             task_executor=TaskExecutor(automation_manager=self.automation_manager)
         )
-        self.wake_word_manager: WakeWordManager | None = None
         self.chat_window: ChatWindow | None = None
         self.file_manager_window: FileManagerWindow | None = None
         self.hardware_window: HardwareWindow | None = None
@@ -53,13 +59,14 @@ class MainWindow(ctk.CTk):
         self.voice_animation: VoiceAnimation | None = None
         self.chat_textbox: ctk.CTkTextbox | None = None
         self._is_closing = False
+        self._is_listening_once = False
 
         self._configure_window()
         self.create_header()
         self.create_status_bar()
         self.create_chat_area()
         self.create_toolbar()
-        self._start_wake_word_system()
+        self.after(2200, self._greet_user)
 
     def _configure_window(self) -> None:
         """Apply the core window settings."""
@@ -145,15 +152,15 @@ class MainWindow(ctk.CTk):
 
         self.status_value_label = ctk.CTkLabel(
             status_frame,
-            text="Sleeping",
+            text="Ready",
             font=ctk.CTkFont(size=16),
-            text_color="#38BDF8",
+            text_color="#22C55E",
         )
         self.status_value_label.grid(row=0, column=1, padx=(0, 24), pady=12, sticky="w")
 
         mode_label = ctk.CTkLabel(
             status_frame,
-            text="Voice animation active",
+            text="Voice-first mode - no wake word required",
             font=ctk.CTkFont(size=13),
             text_color="#94A3B8",
         )
@@ -185,8 +192,9 @@ class MainWindow(ctk.CTk):
             "1.0",
             (
                 "HI ROLEX is ready.\n\n"
-                "Say \"Hi Rolex\" for voice commands, or open Chat for typed commands.\n\n"
-                "Dashboard activity will appear here."
+                "Press Listen Now and speak naturally.\n\n"
+                "You can ask questions or give commands like open notepad, close chrome, "
+                "or set volume to 50."
             ),
         )
         self.chat_textbox.configure(state="disabled")
@@ -198,7 +206,7 @@ class MainWindow(ctk.CTk):
         toolbar_frame.grid_columnconfigure((0, 1, 2, 3, 4, 5, 6), weight=1)
 
         buttons: list[tuple[str, Callable[[], None]]] = [
-            (self.language_manager.translate("microphone"), self.open_voice_test_window),
+            ("Listen Now", self.listen_once_from_dashboard),
             (self.language_manager.translate("chat"), self.open_chat_window),
             (self.language_manager.translate("settings"), self.open_settings_window),
             (self.language_manager.translate("files"), self.open_file_manager_window),
@@ -279,16 +287,61 @@ class MainWindow(ctk.CTk):
 
         self.memory_window = MemoryWindow(self)
 
-    def _start_wake_word_system(self) -> None:
-        """Create and start the background wake-word system."""
-        self.wake_word_manager = WakeWordManager(
-            settings_manager=self.settings_manager,
-            speech_manager=self.speech_manager,
-            on_status_change=self.set_status,
-            on_command_recognized=self.display_recognized_command,
-            on_error=self.display_wake_error,
-        )
-        self.wake_word_manager.start()
+    def listen_once_from_dashboard(self) -> None:
+        """Listen for one spoken command without requiring a wake word."""
+        if self._is_listening_once or self._is_closing:
+            return
+
+        self._is_listening_once = True
+        self.set_status("Listening")
+        self._append_chat_message("HI ROLEX", "Listening...")
+        thread = threading.Thread(target=self._listen_once_in_background, daemon=True)
+        thread.start()
+
+    def _listen_once_in_background(self) -> None:
+        """Capture one voice command, execute it, and speak the result."""
+        command = self.speech_manager.listen_once()
+        if self._is_recognition_error(command):
+            self.after(0, lambda: self._handle_listen_error(command))
+            return
+
+        self.after(0, lambda: self._append_chat_message("You", command))
+        self.set_status("Processing")
+        result = self.command_router.handle_user_input(command, source="voice")
+        self.after(0, lambda: self._handle_voice_result(result))
+
+    def _handle_voice_result(self, result: RouterCommandResult) -> None:
+        """Display a compact voice result and finish the listening cycle."""
+        self._append_router_result(result)
+        self._is_listening_once = False
+        self._speak_short_feedback(result)
+
+    def _handle_listen_error(self, message: str) -> None:
+        """Recover cleanly when voice capture fails."""
+        self._is_listening_once = False
+        self._append_chat_message("Voice", message)
+        self.set_status("Speaking")
+        threading.Thread(
+            target=self._speak_and_set_ready,
+            args=("I did not catch that. Please try again.",),
+            daemon=True,
+        ).start()
+
+    def _is_recognition_error(self, text: str) -> bool:
+        """Return True when speech-to-text returned a friendly error message."""
+        return text in self.LISTENING_ERRORS or text.startswith("Microphone error:")
+
+    def _greet_user(self) -> None:
+        """Greet Ronak by voice after the app has opened."""
+        if self._is_closing:
+            return
+        self._append_chat_message("HI ROLEX", self.GREETING_TEXT)
+        self.set_status("Speaking")
+        threading.Thread(
+            target=self._speak_and_set_ready,
+            args=(self.GREETING_TEXT,),
+            daemon=True,
+        ).start()
 
     def set_status(self, status: str) -> None:
         """Update the status indicator from any thread."""
@@ -305,6 +358,7 @@ class MainWindow(ctk.CTk):
             "Sleeping": "#38BDF8",
             "Listening": "#22C55E",
             "Processing": "#F59E0B",
+            "Thinking": "#F59E0B",
             "Speaking": "#A78BFA",
             "Ready": "#22C55E",
         }
@@ -368,8 +422,16 @@ class MainWindow(ctk.CTk):
             feedback = "I could not complete that request."
 
         self.set_status("Speaking")
-        self.speech_manager.speak(feedback)
-        self.set_status("Ready" if result.success else "Sleeping")
+        threading.Thread(
+            target=self._speak_and_set_ready,
+            args=(feedback,),
+            daemon=True,
+        ).start()
+
+    def _speak_and_set_ready(self, text: str) -> None:
+        """Speak text without freezing the GUI, then return to Ready."""
+        self.speech_manager.speak(text)
+        self.set_status("Ready")
 
     def close_application(self) -> None:
         """Close the HI ROLEX application."""
@@ -400,11 +462,6 @@ class MainWindow(ctk.CTk):
         if self.voice_animation is not None:
             try:
                 self.voice_animation.stop()
-            except Exception:
-                pass
-        if self.wake_word_manager is not None:
-            try:
-                self.wake_word_manager.stop()
             except Exception:
                 pass
         try:
